@@ -99,3 +99,23 @@ copier copy --trust --defaults --overwrite --vcs-ref=HEAD \
             -d template=ros2_interfaces_pkg \
             -d package_name=ros2_interfaces_pkg \
             $template_dir $script_dir
+
+copier copy --trust --defaults --overwrite --vcs-ref=HEAD \
+            -d template=ros2_controller_pkg \
+            -d package_name=ros2_controller_all_pkg \
+            -d controller_name=custom_controller \
+            -d has_launch_file=true \
+            -d has_subscriber=true \
+            -d has_publisher=true \
+            -d has_docker_ros=false \
+            $template_dir $script_dir
+
+copier copy --trust --defaults --overwrite --vcs-ref=HEAD \
+            -d template=ros2_controller_pkg \
+            -d package_name=ros2_controller_no_pub_sub_pkg \
+            -d controller_name=custom_controller \
+            -d has_launch_file=true \
+            -d has_subscriber=false \
+            -d has_publisher=false \
+            -d has_docker_ros=false \
+            $template_dir $script_dir

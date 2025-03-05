@@ -1,0 +1,8 @@
+controller_manager:
+  ros__parameters:
+    # Controller manager update rate
+    update_rate: 1000  # Hz
+
+    # List all controllers which will be loaded (but not activated!) when this controller manager is started
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
