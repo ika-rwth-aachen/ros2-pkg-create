@@ -2,25 +2,30 @@
 #define {{package_name | upper }}_{{controller_name | upper }}
 
 #include <memory>
-#include <string>
-#include <vector>
 
 #include <Eigen/Eigen>
-#include <Eigen/src/Core/Matrix.h>
 #include <Eigen/src/Core/IO.h>
+#include <Eigen/src/Core/Matrix.h>
 
 #include <rclcpp/duration.hpp>
 #include <rclcpp/rclcpp.hpp>
+{% if has_subscriber %}
+#include <rclcpp/subscription.hpp>
+{% endif %}
 #include <rclcpp/time.hpp>
+{% if has_publisher %}
+#include <rclcpp_lifecycle/lifecycle_publisher.hpp>
+{% endif %}
+#include <rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp>
 #include <rclcpp_lifecycle/state.hpp>
 
 #include <controller_interface/controller_interface.hpp>
 #include <controller_interface/controller_interface_base.hpp>
 {% if has_subscriber %}
-#include "realtime_tools/realtime_buffer.hpp"
+#include <realtime_tools/realtime_buffer.hpp>
 {% endif %}
-{% if has_subscriber %}
-#include "realtime_tools/realtime_publisher.hpp"
+{% if has_publisher %}
+#include <realtime_tools/realtime_publisher.hpp>
 {% endif %}
 
 
