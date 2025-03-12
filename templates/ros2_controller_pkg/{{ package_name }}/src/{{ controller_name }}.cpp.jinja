@@ -50,7 +50,7 @@ controller_interface::CallbackReturn {{ controller_class_name }}::on_init() {
     auto_declare<std::vector<double>>("d_gains", {});
     auto_declare<double>("velocity_filter_alpha_gain", 0.99);
 {% if has_subscriber %}
-    auto_declare<std::string>("cmd_topic", "~/cmd_vel");
+    auto_declare<std::string>("cmd_topic", "~/cmd_pose");
 {% endif %}
 {% if has_publisher %}
     auto_declare<std::string>("state_topic", "~/commanded_state");
