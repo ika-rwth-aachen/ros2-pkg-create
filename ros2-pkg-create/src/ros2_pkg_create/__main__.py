@@ -51,6 +51,8 @@ def parseArguments() -> argparse.Namespace:
     parser.add_argument("--srv-name", type=str, default=None, help="Service name")
     parser.add_argument("--action-name", type=str, default=None, help="Action name")
     parser.add_argument("--has-docker-ros", action="store_true", default=None, help="Add the docker-ros CI integration?")
+    parser.add_argument("--controller-name", type=str, default=None, help="Controller name (snake_case)")
+    parser.add_argument("--controller-class-name", type=str, default=None, help="Class name of controller (PascalCase)")
 
     parser.add_argument("--version", action="version", version=f"%(prog)s v{ros2_pkg_create.__version__}")
 
