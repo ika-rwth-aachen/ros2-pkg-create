@@ -164,3 +164,10 @@ has_docker_ros:
   help: Add the docker-ros CI integration?
   type: bool
   default: false
+
+docker_ros_type:
+  help: Type of docker-ros CI integration
+  when: "{{ has_docker_ros }}"
+  type: str
+  default: gitlab
+  choices: [github, gitlab]
