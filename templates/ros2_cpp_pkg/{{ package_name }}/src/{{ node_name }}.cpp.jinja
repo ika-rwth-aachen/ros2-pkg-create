@@ -180,7 +180,7 @@ void {{ node_class_name }}::setup() {
 {% endif %}
 {% if has_timer and not is_lifecycle %}
 
-  // timer for repeatedly invoking a callback to publish messages
+  // timer for repeatedly invoking a callback
   timer_ = this->create_wall_timer(std::chrono::duration<double>(1.0), std::bind(&{{ node_class_name }}::timerCallback, this));
 {% endif %}
 {% if auto_shutdown and not is_lifecycle %}
@@ -191,9 +191,22 @@ void {{ node_class_name }}::setup() {
 {% if has_subscriber %}
 
 
-void {{ node_class_name }}::topicCallback(const std_msgs::msg::Int32& msg) {
+void {{ node_class_name }}::topicCallback(const std_msgs::msg::Int32::ConstSharedPtr& msg) {
 
-  RCLCPP_INFO(this->get_logger(), "Message received: '%d'", msg.data);
+  RCLCPP_INFO(this->get_logger(), "Message received: '%d'", msg->data);
+
+  // publish message
+{% if is_component %}
+  std_msgs::msg::Int32::UniquePtr out_msg = std::make_unique<std_msgs::msg::Int32>();
+  out_msg->data = msg->data;
+  publisher_->publish(std::move(out_msg));
+  RCLCPP_INFO(this->get_logger(), "Message published: '%d'", msg->data);
+{% else %}
+  std_msgs::msg::Int32 out_msg;
+  out_msg.data = msg->data;
+  publisher_->publish(out_msg);
+  RCLCPP_INFO(this->get_logger(), "Message published: '%d'", msg.data);
+{% endif %}
 }
 {% endif %}
 {% if has_service_server %}

@@ -149,7 +149,7 @@ class {{ node_class_name }} : public rclcpp::Node {
    *
    * @param msg message
    */
-  void topicCallback(const std_msgs::msg::Int32& msg);
+  void topicCallback(const std_msgs::msg::Int32::ConstSharedPtr& msg);
 {% endif %}
 {% if has_service_server %}
 
