@@ -154,7 +154,7 @@ void Ros2CppNode::topicCallback(const std_msgs::msg::Int32::ConstSharedPtr& msg)
   std_msgs::msg::Int32::UniquePtr out_msg = std::make_unique<std_msgs::msg::Int32>();
   out_msg->data = msg->data;
   publisher_->publish(std::move(out_msg));
-  RCLCPP_INFO(this->get_logger(), "Message published: '%d'", msg->data);
+  RCLCPP_INFO(this->get_logger(), "Message published: '%d'", out_msg->data);
 }
 
 
