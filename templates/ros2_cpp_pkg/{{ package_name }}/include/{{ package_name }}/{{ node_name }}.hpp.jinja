@@ -35,6 +35,9 @@ template <typename C> inline constexpr bool is_vector_v = is_vector<C>::value;
 {% endif %}
 
 
+/**
+ * @brief {{ node_class_name }} class
+ */
 {% if is_lifecycle %}
 class {{ node_class_name }} : public rclcpp_lifecycle::LifecycleNode {
 {% else %}
@@ -212,18 +215,30 @@ class {{ node_class_name }} : public rclcpp::Node {
  private:
 {% if has_params or is_lifecycle %}
 
+  /**
+   * @brief Auto-reconfigurable parameters for dynamic reconfiguration
+   */
   std::vector<std::tuple<std::string, std::function<void(const rclcpp::Parameter &)>>> auto_reconfigurable_params_;
 {% endif %}
 {% if has_params %}
 
+  /**
+   * @brief Callback handle for dynamic parameter reconfiguration
+   */
   OnSetParametersCallbackHandle::SharedPtr parameters_callback_;
 {% endif %}
 {% if has_subscriber %}
 
+  /**
+   * @brief Subscriber
+   */
   rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr subscriber_;
 {% endif %}
 {% if has_publisher %}
 
+  /**
+   * @brief Publisher
+   */
 {% if is_lifecycle %}
   rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>::SharedPtr publisher_;
 {% else %}
@@ -232,22 +247,37 @@ class {{ node_class_name }} : public rclcpp::Node {
 {% endif %}
 {% if has_service_server %}
 
+  /**
+   * @brief Service server
+   */
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_;
 {% endif %}
 {% if has_action_server %}
 
+  /**
+   * @brief Action server
+   */
   rclcpp_action::Server<{{ package_name }}_interfaces::action::Fibonacci>::SharedPtr action_server_;
 {% endif %}
 {% if has_timer %}
 
+  /**
+   * @brief Timer
+   */
   rclcpp::TimerBase::SharedPtr timer_;
 {% endif %}
 {% if has_params %}
 
+  /**
+   * @brief Dummy parameter (parameter) 
+   */
   double param_ = 1.0;
 {% endif %}
 {% if auto_shutdown %}
 
+  /**
+   * @brief Timer for auto-shutdown
+   */
   rclcpp::TimerBase::SharedPtr auto_shutdown_timer_;
 {% endif %}
 };
