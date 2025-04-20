@@ -90,7 +90,8 @@ void {{ node_class_name }}::declareAndLoadParameter(const std::string& name,
     ss << "Loaded parameter '" << name << "': ";
     if constexpr(is_vector_v<T>) {
       ss << "[";
-      for (const auto& element : param) ss << element << (&element != &param.back() ? ", " : "]");
+      for (const auto& element : param) ss << element << (&element != &param.back() ? ", " : "");
+      ss << "]";
     } else {
       ss << param;
     }
@@ -104,7 +105,8 @@ void {{ node_class_name }}::declareAndLoadParameter(const std::string& name,
       ss << "Missing parameter '" << name << "', using default value: ";
       if constexpr(is_vector_v<T>) {
         ss << "[";
-        for (const auto& element : param) ss << element << (&element != &param.back() ? ", " : "]");
+        for (const auto& element : param) ss << element << (&element != &param.back() ? ", " : "");
+        ss << "]";
       } else {
         ss << param;
       }
