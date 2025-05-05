@@ -20,11 +20,6 @@ RCLCPP_COMPONENTS_REGISTER_NODE({{ package_name }}::{{ node_class_name }})
 namespace {{ package_name }} {
 
 
-/**
- * @brief Constructor
- *
- * @param options node options
- */
 {% if is_lifecycle and is_component %}
 {{ node_class_name }}::{{ node_class_name }}(const rclcpp::NodeOptions& options) : rclcpp_lifecycle::LifecycleNode("{{ node_name }}", options) {
 {% elif is_lifecycle %}
@@ -52,20 +47,6 @@ namespace {{ package_name }} {
 {% if has_params or is_lifecycle %}
 
 
-/**
- * @brief Declares and loads a ROS parameter
- *
- * @param name name
- * @param param parameter variable to load into
- * @param description description
- * @param add_to_auto_reconfigurable_params enable reconfiguration of parameter
- * @param is_required whether failure to load parameter will stop node
- * @param read_only set parameter to read-only
- * @param from_value parameter range minimum
- * @param to_value parameter range maximum
- * @param step_value parameter range step
- * @param additional_constraints additional constraints description
- */
 template <typename T>
 void {{ node_class_name }}::declareAndLoadParameter(const std::string& name,
                                                          T& param,
@@ -109,7 +90,8 @@ void {{ node_class_name }}::declareAndLoadParameter(const std::string& name,
     ss << "Loaded parameter '" << name << "': ";
     if constexpr(is_vector_v<T>) {
       ss << "[";
-      for (const auto& element : param) ss << element << (&element != &param.back() ? ", " : "]");
+      for (const auto& element : param) ss << element << (&element != &param.back() ? ", " : "");
+      ss << "]";
     } else {
       ss << param;
     }
@@ -123,7 +105,8 @@ void {{ node_class_name }}::declareAndLoadParameter(const std::string& name,
       ss << "Missing parameter '" << name << "', using default value: ";
       if constexpr(is_vector_v<T>) {
         ss << "[";
-        for (const auto& element : param) ss << element << (&element != &param.back() ? ", " : "]");
+        for (const auto& element : param) ss << element << (&element != &param.back() ? ", " : "");
+        ss << "]";
       } else {
         ss << param;
       }
@@ -143,12 +126,6 @@ void {{ node_class_name }}::declareAndLoadParameter(const std::string& name,
 {% if has_params %}
 
 
-/**
- * @brief Handles reconfiguration when a parameter value is changed
- *
- * @param parameters parameters
- * @return parameter change result
- */
 rcl_interfaces::msg::SetParametersResult {{ node_class_name }}::parametersCallback(const std::vector<rclcpp::Parameter>& parameters) {
 
   for (const auto& param : parameters) {
@@ -169,9 +146,6 @@ rcl_interfaces::msg::SetParametersResult {{ node_class_name }}::parametersCallba
 {% endif %}
 
 
-/**
- * @brief Sets up subscribers, publishers, etc. to configure the node
- */
 void {{ node_class_name }}::setup() {
 {% if has_params %}
 
@@ -208,7 +182,7 @@ void {{ node_class_name }}::setup() {
 {% endif %}
 {% if has_timer and not is_lifecycle %}
 
-  // timer for repeatedly invoking a callback to publish messages
+  // timer for repeatedly invoking a callback
   timer_ = this->create_wall_timer(std::chrono::duration<double>(1.0), std::bind(&{{ node_class_name }}::timerCallback, this));
 {% endif %}
 {% if auto_shutdown and not is_lifecycle %}
@@ -219,25 +193,27 @@ void {{ node_class_name }}::setup() {
 {% if has_subscriber %}
 
 
-/**
- * @brief Processes messages received by a subscriber
- *
- * @param msg message
- */
-void {{ node_class_name }}::topicCallback(const std_msgs::msg::Int32& msg) {
+void {{ node_class_name }}::topicCallback(const std_msgs::msg::Int32::ConstSharedPtr& msg) {
 
-  RCLCPP_INFO(this->get_logger(), "Message received: '%d'", msg.data);
+  RCLCPP_INFO(this->get_logger(), "Message received: '%d'", msg->data);
+
+  // publish message
+{% if is_component %}
+  std_msgs::msg::Int32::UniquePtr out_msg = std::make_unique<std_msgs::msg::Int32>();
+  out_msg->data = msg->data;
+  publisher_->publish(std::move(out_msg));
+  RCLCPP_INFO(this->get_logger(), "Message published: '%d'", out_msg->data);
+{% else %}
+  std_msgs::msg::Int32 out_msg;
+  out_msg.data = msg->data;
+  publisher_->publish(out_msg);
+  RCLCPP_INFO(this->get_logger(), "Message published: '%d'", out_msg.data);
+{% endif %}
 }
 {% endif %}
 {% if has_service_server %}
 
 
-/**
- * @brief Processes service requests
- *
- * @param request service request
- * @param response service response
- */
 void {{ node_class_name }}::serviceCallback(const std_srvs::srv::SetBool::Request::SharedPtr request, std_srvs::srv::SetBool::Response::SharedPtr response) {
 
   (void)request;
@@ -250,13 +226,6 @@ void {{ node_class_name }}::serviceCallback(const std_srvs::srv::SetBool::Reques
 {% if has_action_server %}
 
 
-/**
- * @brief Processes action goal requests
- *
- * @param uuid unique goal identifier
- * @param goal action goal
- * @return goal response
- */
 rclcpp_action::GoalResponse {{ node_class_name }}::actionHandleGoal(const rclcpp_action::GoalUUID& uuid, {{ package_name }}_interfaces::action::Fibonacci::Goal::ConstSharedPtr goal) {
 
   (void)uuid;
@@ -268,12 +237,6 @@ rclcpp_action::GoalResponse {{ node_class_name }}::actionHandleGoal(const rclcpp
 }
 
 
-/**
- * @brief Processes action cancel requests
- *
- * @param goal_handle action goal handle
- * @return cancel response
- */
 rclcpp_action::CancelResponse {{ node_class_name }}::actionHandleCancel(const std::shared_ptr<rclcpp_action::ServerGoalHandle<{{ package_name }}_interfaces::action::Fibonacci>> goal_handle) {
 
   (void)goal_handle;
@@ -284,11 +247,6 @@ rclcpp_action::CancelResponse {{ node_class_name }}::actionHandleCancel(const st
 }
 
 
-/**
- * @brief Processes accepted action goal requests
- *
- * @param goal_handle action goal handle
- */
 void {{ node_class_name }}::actionHandleAccepted(const std::shared_ptr<rclcpp_action::ServerGoalHandle<{{ package_name }}_interfaces::action::Fibonacci>> goal_handle) {
 
   // execute action in a separate thread to avoid blocking
@@ -296,11 +254,6 @@ void {{ node_class_name }}::actionHandleAccepted(const std::shared_ptr<rclcpp_ac
 }
 
 
-/**
- * @brief Executes an action
- *
- * @param goal_handle action goal handle
- */
 void {{ node_class_name }}::actionExecute(const std::shared_ptr<rclcpp_action::ServerGoalHandle<{{ package_name }}_interfaces::action::Fibonacci>> goal_handle) {
 
   RCLCPP_INFO(this->get_logger(), "Executing action goal");
@@ -351,9 +304,6 @@ void {{ node_class_name }}::actionExecute(const std::shared_ptr<rclcpp_action::S
 {% if has_timer %}
 
 
-/**
- * @brief Processes timer triggers
- */
 void {{ node_class_name }}::timerCallback() {
 
   RCLCPP_INFO(this->get_logger(), "Timer triggered");
@@ -362,9 +312,6 @@ void {{ node_class_name }}::timerCallback() {
 {% if auto_shutdown %}
 
 
-/**
- * @brief Processes timer triggers to auto-shutdown the node
- */
 void {{ node_class_name }}::autoShutdownTimerCallback() {
 
   RCLCPP_INFO(this->get_logger(), "Shutting down");
@@ -374,12 +321,6 @@ void {{ node_class_name }}::autoShutdownTimerCallback() {
 {% if is_lifecycle %}
 
 
-/**
- * @brief Processes 'configuring' transitions to 'inactive' state
- *
- * @param state previous state
- * @return transition result
- */
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn {{ node_class_name }}::on_configure(const rclcpp_lifecycle::State& state) {
 
   RCLCPP_INFO(get_logger(), "Configuring to enter 'inactive' state from '%s' state", state.label().c_str());
@@ -393,12 +334,6 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn {{ nod
 }
 
 
-/**
- * @brief Processes 'activating' transitions to 'active' state
- *
- * @param state previous state
- * @return transition result
- */
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn {{ node_class_name }}::on_activate(const rclcpp_lifecycle::State& state) {
 
   RCLCPP_INFO(get_logger(), "Activating to enter 'active' state from '%s' state", state.label().c_str());
@@ -418,12 +353,6 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn {{ nod
 }
 
 
-/**
- * @brief Processes 'deactivating' transitions to 'inactive' state
- *
- * @param state previous state
- * @return transition result
- */
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn {{ node_class_name }}::on_deactivate(const rclcpp_lifecycle::State& state) {
 
   RCLCPP_INFO(get_logger(), "Deactivating to enter 'inactive' state from '%s' state", state.label().c_str());
@@ -439,12 +368,6 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn {{ nod
 }
 
 
-/**
- * @brief Processes 'cleningup' transitions to 'unconfigured' state
- *
- * @param state previous state
- * @return transition result
- */
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn {{ node_class_name }}::on_cleanup(const rclcpp_lifecycle::State& state) {
 
   RCLCPP_INFO(get_logger(), "Cleaning up to enter 'unconfigured' state from '%s' state", state.label().c_str());
@@ -472,12 +395,6 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn {{ nod
 }
 
 
-/**
- * @brief Processes 'shuttingdown' transitions to 'finalized' state
- *
- * @param state previous state
- * @return transition result
- */
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn {{ node_class_name }}::on_shutdown(const rclcpp_lifecycle::State& state) {
 
   RCLCPP_INFO(get_logger(), "Shutting down to enter 'finalized' state from '%s' state", state.label().c_str());

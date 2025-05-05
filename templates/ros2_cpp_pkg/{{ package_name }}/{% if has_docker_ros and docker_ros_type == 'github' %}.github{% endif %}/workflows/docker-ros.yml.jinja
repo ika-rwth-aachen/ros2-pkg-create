@@ -1,0 +1,12 @@
+name: docker-ros
+on: push
+jobs:
+  latest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ika-rwth-aachen/docker-ros@main
+        with:
+          platform: amd64
+          target: dev,run
+          base-image: rwthika/ros2:latest
+          command: ros2 run {{ package_name }} {{ node_name }}
