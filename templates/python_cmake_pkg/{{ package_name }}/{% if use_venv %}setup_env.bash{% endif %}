@@ -1,0 +1,6 @@
+cd $1
+rm -rf "$2_env"
+python3 -m venv "$2_env"
+source "$2_env/bin/activate"
+pip3 install -r requirements.txt
+deactivate

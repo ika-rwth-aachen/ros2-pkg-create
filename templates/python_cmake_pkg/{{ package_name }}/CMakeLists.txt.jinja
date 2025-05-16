@@ -1,0 +1,61 @@
+cmake_minimum_required(VERSION 3.8)
+project({{ package_name }})
+
+# Default to C++17
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+find_package(ament_cmake REQUIRED)
+{% if has_reconfigurable_params or is_lifecycle %}
+find_package(hector_ros2_utils REQUIRED)
+{% endif %}
+find_package(rclcpp REQUIRED)
+find_package(rclpy REQUIRED)
+{% if has_action_server %}
+find_package(rclcpp_action REQUIRED)
+find_package({{ package_name }}_msgs REQUIRED)
+{% endif %}
+find_package(std_msgs REQUIRED)
+{% if has_service_server %}
+find_package(std_srvs REQUIRED)
+{% endif %}
+
+{% if use_venv %}
+set(REQUIREMENTS_OUTPUT ${CMAKE_BINARY_DIR}/requirements.txt)
+
+# Custom command to setup venv if requirements.txt changed
+add_custom_command(
+  OUTPUT ${REQUIREMENTS_OUTPUT}
+  COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/requirements.txt
+          ${REQUIREMENTS_OUTPUT}
+  COMMAND bash ${CMAKE_SOURCE_DIR}/setup_env.bash ${CMAKE_SOURCE_DIR}
+          ${PROJECT_NAME}
+  DEPENDS ${CMAKE_SOURCE_DIR}/requirements.txt
+  COMMENT "Running setup.bash after copying requirements.txt")
+
+add_custom_target(
+  rebuild_venv ALL
+  DEPENDS ${REQUIREMENTS_OUTPUT}
+  COMMENT "Add venv setup target")
+{% endif %}
+
+# Install Python modules
+ament_python_install_package(${PROJECT_NAME})
+
+# Install Python executables
+install(PROGRAMS {{package_name}}/{{node_name}}.py
+        DESTINATION lib/${PROJECT_NAME})
+
+install(DIRECTORY config launch
+  DESTINATION share/${PROJECT_NAME}
+  OPTIONAL
+)
+
+# ament_export_dependencies(${DEPENDENCIES})
+
+ament_package()

@@ -8,7 +8,7 @@ template:
   help: Template
   type: str
   default: cpp_pkg
-  choices: [cpp_pkg, msgs_pkg, python_pkg, launch_pkg, ci]
+  choices: [cpp_pkg, msgs_pkg, python_pkg, launch_pkg, ci, python_cmake_pkg]
 
 package_name:
   help: Package name
@@ -56,13 +56,13 @@ license:
 
 node_name:
   help: Node name
-  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' }}"
+  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' or template == 'python_cmake_pkg' }}"
   type: str
   default: "{{ package_name }}"
 
 node_class_name:
   help: Class name of node
-  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' }}"
+  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' or template == 'python_cmake_pkg'}}"
   type: str
   default: "{{ node_name.replace('_', ' ').replace('-', ' ').title().replace(' ', '') }}"
 
@@ -80,7 +80,7 @@ is_lifecycle:
 
 has_launch_file:
   help: Add a launch file?
-  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' }}"
+  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' or template == 'python_cmake_pkg'}}"
   type: bool
   default: false
 
@@ -93,7 +93,7 @@ launch_file_type:
 
 has_params:
   help: Add parameter loading?
-  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' }}"
+  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' or template == 'python_cmake_pkg' }}"
   type: bool
   default: false
 
@@ -124,40 +124,46 @@ has_startup_params:
 
 has_subscriber:
   help: Add a subscriber?
-  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' }}"
+  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' or template == 'python_cmake_pkg'}}"
   type: bool
   default: false
 
 has_publisher:
   help: Add a publisher?
-  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' }}"
+  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' or template == 'python_cmake_pkg' }}"
   type: bool
   default: false
 
 has_service_server:
   help: Add a service server?
-  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' }}"
+  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' or template == 'python_cmake_pkg' }}"
   type: bool
   default: false
 
 has_action_server:
   help: Add an action server?
-  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' }}"
+  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' or template == 'python_cmake_pkg' }}"
   type: bool
   default: false
 
 has_timer:
   help: Add a timer callback?
-  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' }}"
+  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' or template == 'python_cmake_pkg' }}"
   type: bool
   default: false
 
 auto_shutdown:
   help: Automatically shutdown the node after launch (useful in CI/CD)?
-  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' }}"
+  when: "{{ template == 'cpp_pkg' or template == 'python_pkg' or template == 'python_cmake_pkg' }}"
   when: false
   type: bool
   default: false
+
+use_venv:
+  help: Create virtual environment for this package?
+  when: "{{ template == 'python_cmake_pkg' }}"
+  type: bool
+  default: true
 
 interface_types:
   help: Interfaces types

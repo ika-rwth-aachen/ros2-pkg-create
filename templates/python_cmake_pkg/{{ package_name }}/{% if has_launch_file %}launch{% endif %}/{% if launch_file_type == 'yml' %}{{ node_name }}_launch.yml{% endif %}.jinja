@@ -1,0 +1,15 @@
+launch:
+  - arg:
+      name: name
+      default: {{ node_name }}
+      description: node name
+  - node:
+      pkg: {{ package_name }}
+      exec: {{ node_name }}
+      name: "$(var name)"
+      output: screen
+{% if has_params %}
+      param:
+        - name: param
+          value: 1.0
+{% endif %}

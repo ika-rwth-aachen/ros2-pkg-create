@@ -1,0 +1,12 @@
+<launch>
+
+  <arg name="name" default="{{ node_name }}" description="node name" />
+  <arg name="params" default="$(find-pkg-share {{ package_name }})/config/params.yml" description="path to parameter file" />
+
+  <node pkg="{{ package_name }}" exec="{{ node_name }}" name="$(var name)" output="screen">
+{% if has_params %}
+    <param from="$(arg params)" />
+{% endif %}
+  </node>
+
+</launch>
