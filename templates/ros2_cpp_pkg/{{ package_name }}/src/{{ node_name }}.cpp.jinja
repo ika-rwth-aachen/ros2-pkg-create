@@ -197,17 +197,19 @@ void {{ node_class_name }}::topicCallback(const std_msgs::msg::Int32::ConstShare
 
   RCLCPP_INFO(this->get_logger(), "Message received: '%d'", msg->data);
 
+{% if has_publisher %}
   // publish message
-{% if is_component %}
+  {% if is_component %}
   std_msgs::msg::Int32::UniquePtr out_msg = std::make_unique<std_msgs::msg::Int32>();
   out_msg->data = msg->data;
   publisher_->publish(std::move(out_msg));
   RCLCPP_INFO(this->get_logger(), "Message published: '%d'", out_msg->data);
-{% else %}
+  {% else %}
   std_msgs::msg::Int32 out_msg;
   out_msg.data = msg->data;
   publisher_->publish(out_msg);
   RCLCPP_INFO(this->get_logger(), "Message published: '%d'", out_msg.data);
+  {% endif %}
 {% endif %}
 }
 {% endif %}
