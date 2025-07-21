@@ -2,6 +2,8 @@ This file is a work in progress to showcase how to use the ROS 2 controller pack
 
 ## Generate controller package
 
+Note: omit the `--defualts` flag if you want to specify all options yourself.
+
 ```bash
 ros2-pkg-create ~/my_ws/src/ --template ros2_controller_pkg --use-local-templates --defaults --package-name custom_franka_controller --controller-name custom_controller
 ```
