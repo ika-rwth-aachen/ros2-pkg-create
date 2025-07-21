@@ -63,6 +63,18 @@ node_class_name:
   type: str
   default: "{{ node_name | to_camel }}"
 
+controller_name:
+  help: Controller name
+  when: "{{ template == 'ros2_controller_pkg' }}"
+  type: str
+  default: "{{ package_name }}"
+
+controller_class_name:
+  help: Class name of controller
+  when: "{{ template == 'ros2_controller_pkg' }}"
+  type: str
+  default: "{{ controller_name | to_camel }}"
+
 is_component:
   help: Make it a component?
   when: "{{ template == 'ros2_cpp_pkg' }}"
@@ -114,7 +126,7 @@ has_service_server:
 
 has_action_server:
   help: Add an action server?
-  when: "{{ template == 'ros2_cpp_pkg' or template == 'ros2_python_pkg' or template == 'ros2_controller_pkg' }}"
+  when: "{{ template == 'ros2_cpp_pkg' or template == 'ros2_python_pkg' }}"
   type: bool
   default: false
 
@@ -164,15 +176,3 @@ has_docker_ros:
   help: Add the docker-ros CI integration?
   type: bool
   default: false
-
-controller_name:
-  help: Controller name
-  when: "{{ template == 'ros2_controller_pkg' }}"
-  type: str
-  default: "my_controller"
-
-controller_class_name:
-  help: Class name of controller
-  when: "{{ template == 'ros2_controller_pkg' }}"
-  type: str
-  default: "{{ controller_name | to_camel }}"
