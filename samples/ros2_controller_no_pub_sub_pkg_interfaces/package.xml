@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+
+  <name>ros2_controller_no_pub_sub_pkg_interfaces</name>
+  <version>0.0.0</version>
+  <description>Interfaces for ros2_controller_no_pub_sub_pkg</description>
+
+  <maintainer email="todo@TODO.com">TODO</maintainer>
+  <author email="todo@TODO.com">TODO</author>
+
+  <license>TODO</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>rosidl_default_generators</build_depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+
+  <member_of_group>rosidl_interface_packages</member_of_group>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+
+</package>

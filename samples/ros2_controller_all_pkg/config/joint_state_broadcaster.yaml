@@ -1,0 +1,4 @@
+joint_state_broadcaster:
+  ros__parameters:
+    # Controller type
+    type: joint_state_broadcaster/JointStateBroadcaster

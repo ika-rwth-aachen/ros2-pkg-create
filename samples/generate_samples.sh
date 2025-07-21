@@ -107,7 +107,6 @@ copier copy --trust --defaults --overwrite --vcs-ref=HEAD \
             -d has_launch_file=true \
             -d has_subscriber=true \
             -d has_publisher=true \
-            -d has_docker_ros=false \
             $template_dir $script_dir
 
 copier copy --trust --defaults --overwrite --vcs-ref=HEAD \
@@ -117,5 +116,4 @@ copier copy --trust --defaults --overwrite --vcs-ref=HEAD \
             -d has_launch_file=true \
             -d has_subscriber=false \
             -d has_publisher=false \
-            -d has_docker_ros=false \
             $template_dir $script_dir

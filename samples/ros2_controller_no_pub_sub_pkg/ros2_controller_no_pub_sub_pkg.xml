@@ -1,0 +1,7 @@
+<library path="ros2_controller_no_pub_sub_pkg">
+    <class name="ros2_controller_no_pub_sub_pkg/CustomController" type="ros2_controller_no_pub_sub_pkg::CustomController" base_class_type="controller_interface::ControllerInterface">
+        <description>
+            
+        </description>
+    </class>
+</library>
