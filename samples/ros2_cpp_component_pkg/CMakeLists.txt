@@ -25,10 +25,10 @@ target_include_directories(${TARGET_NAME} PUBLIC
 )
 target_compile_features(${TARGET_NAME} PUBLIC c_std_99 cxx_std_17)
 
-ament_target_dependencies(${TARGET_NAME}
-  rclcpp
-  rclcpp_components
-  std_msgs
+target_link_libraries(${TARGET_NAME} PUBLIC
+  ${rclcpp_TARGETS}
+  ${rclcpp_components_TARGETS}
+  ${std_msgs_TARGETS}
 )
 
 install(TARGETS ${TARGET_NAME}
