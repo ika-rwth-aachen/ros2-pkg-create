@@ -32,6 +32,9 @@ def generate_launch_description():
         DeclareLaunchArgument("namespace", default_value="", description="node namespace"),
         DeclareLaunchArgument("params", default_value=os.path.join(get_package_share_directory("{{ package_name }}"), "config", "params.yml"), description="path to parameter file"),
         DeclareLaunchArgument("log_level", default_value="info", description="ROS logging level (debug, info, warn, error, fatal)"),
+{% if not is_component and executor_type == "MultiThreadedExecutor" %}
+        DeclareLaunchArgument("num_threads", default_value="1", description="number of threads for MultiThreadedExecutor"),
+{% endif %}
 {% if is_lifecycle %}
         DeclareLaunchArgument("startup_state", default_value="None", description="initial lifecycle state"),
 {% endif %}
@@ -53,10 +56,18 @@ def generate_launch_description():
                     executable="{{ node_name }}",
                     namespace=LaunchConfiguration("namespace"),
                     name=LaunchConfiguration("name"),
+{% if not is_component and executor_type == "MultiThreadedExecutor" %}
+{% if has_params %}
+                    parameters=[{"num_threads": LaunchConfiguration("num_threads")}, LaunchConfiguration("params")],
+{% else %}
+                    parameters=[{"num_threads": LaunchConfiguration("num_threads")}],
+{% endif %}
+{% else %}
 {% if has_params %}
                     parameters=[LaunchConfiguration("params")],
 {% else %}
                     parameters=[],
+{% endif %}
 {% endif %}
                     arguments=["--ros-args", "--log-level", LaunchConfiguration("log_level")],
                     remappings=[(la.default_value[0].text, LaunchConfiguration(la.name)) for la in remappable_topics],
@@ -73,10 +84,18 @@ def generate_launch_description():
             executable="{{ node_name }}",
             namespace=LaunchConfiguration("namespace"),
             name=LaunchConfiguration("name"),
+{% if not is_component and executor_type == "MultiThreadedExecutor" %}
+{% if has_params %}
+            parameters=[{"num_threads": LaunchConfiguration("num_threads")}, LaunchConfiguration("params")],
+{% else %}
+            parameters=[{"num_threads": LaunchConfiguration("num_threads")}],
+{% endif %}
+{% else %}
 {% if has_params %}
             parameters=[LaunchConfiguration("params")],
 {% else %}
             parameters=[],
+{% endif %}
 {% endif %}
             arguments=["--ros-args", "--log-level", LaunchConfiguration("log_level")],
             remappings=[(la.default_value[0].text, LaunchConfiguration(la.name)) for la in remappable_topics],

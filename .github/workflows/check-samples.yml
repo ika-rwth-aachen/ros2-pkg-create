@@ -16,6 +16,7 @@ jobs:
             node_name: ros2_cpp_node
             is_component: false
             is_lifecycle: false
+            executor_type: SingleThreadedExecutor
             has_launch_file: true
             has_params: true
             has_subscriber: true
@@ -29,6 +30,7 @@ jobs:
             node_name: ros2_cpp_node
             is_component: true
             is_lifecycle: false
+            executor_type: SingleThreadedExecutor
             has_launch_file: true
             has_params: true
             has_subscriber: true
@@ -42,6 +44,21 @@ jobs:
             node_name: ros2_cpp_node
             is_component: false
             is_lifecycle: true
+            executor_type: SingleThreadedExecutor
+            has_launch_file: true
+            has_params: true
+            has_subscriber: true
+            has_publisher: true
+            has_service_server: false
+            has_action_server: false
+            has_timer: false
+            has_docker_ros: true
+          - package_name: ros2_cpp_multi_threaded_pkg
+            template: ros2_cpp_pkg
+            node_name: ros2_cpp_node
+            is_component: false
+            is_lifecycle: true
+            executor_type: MultiThreadedExecutor
             has_launch_file: true
             has_params: true
             has_subscriber: true
@@ -55,6 +72,7 @@ jobs:
             node_name: ros2_cpp_node
             is_component: true
             is_lifecycle: true
+            executor_type: StaticSingleThreadedExecutor
             has_launch_file: true
             has_params: true
             has_subscriber: true

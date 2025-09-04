@@ -22,6 +22,10 @@ jobs:
             template: ros2_cpp_pkg
             is_lifecycle: true
             auto_shutdown: true
+          - package_name: multi_threaded_cpp_pkg
+            template: ros2_cpp_pkg
+            executor_type: MultiThreadedExecutor
+            auto_shutdown: true
           - package_name: service_cpp_pkg
             template: ros2_cpp_pkg
             has_service_server: true
@@ -104,6 +108,7 @@ jobs:
             -d package_name=${{ matrix.package_name }} \
             $( [ "${{ matrix.is_component }}" = "true" ] && echo "-d is_component=true" ) \
             $( [ "${{ matrix.is_lifecycle }}" = "true" ] && echo "-d is_lifecycle=true" ) \
+            $( [ "${{ matrix.executor_type }}" = "true" ] && echo "-d executor_type=${{ matrix.executor_type }}" ) \
             $( [ "${{ matrix.has_service_server }}" = "true" ] && echo "-d has_service_server=true" ) \
             $( [ "${{ matrix.has_action_server }}" = "true" ] && echo "-d has_action_server=true" ) \
             $( [ "${{ matrix.has_timer }}" = "true" ] && echo "-d has_timer=true" ) \
@@ -131,6 +136,8 @@ jobs:
             command: ros2 launch component_cpp_pkg component_cpp_pkg_launch.py
           - package: lifecycle_cpp_pkg
             command: ros2 launch lifecycle_cpp_pkg lifecycle_cpp_pkg_launch.py
+          - package: multi_threaded_cpp_pkg
+            command: ros2 launch multi_threaded_cpp_pkg multi_threaded_cpp_pkg_launch.py
           - package: service_cpp_pkg
             command: ros2 launch service_cpp_pkg service_cpp_pkg_launch.py
           - package: action_cpp_pkg

@@ -18,8 +18,8 @@
 
 namespace ros2_cpp_all_pkg {
 
-template <typename C> struct is_vector : std::false_type {};    
-template <typename T,typename A> struct is_vector< std::vector<T,A> > : std::true_type {};    
+template <typename C> struct is_vector : std::false_type {};
+template <typename T,typename A> struct is_vector< std::vector<T,A> > : std::true_type {};
 template <typename C> inline constexpr bool is_vector_v = is_vector<C>::value;
 
 
@@ -209,7 +209,7 @@ class Ros2CppNode : public rclcpp_lifecycle::LifecycleNode {
   rclcpp::TimerBase::SharedPtr timer_;
 
   /**
-   * @brief Dummy parameter (parameter) 
+   * @brief Dummy parameter (parameter)
    */
   double param_ = 1.0;
 };

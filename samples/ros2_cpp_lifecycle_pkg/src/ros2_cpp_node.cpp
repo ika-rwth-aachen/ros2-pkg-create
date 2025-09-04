@@ -203,7 +203,11 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn Ros2Cp
 int main(int argc, char *argv[]) {
 
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<ros2_cpp_lifecycle_pkg::Ros2CppNode>()->get_node_base_interface());
+  auto node = std::make_shared<ros2_cpp_lifecycle_pkg::Ros2CppNode>();
+  rclcpp::executors::SingleThreadedExecutor executor;
+  RCLCPP_INFO(node->get_logger(), "Spinning node '%s' with %s", node->get_fully_qualified_name(), "SingleThreadedExecutor");
+  executor.add_node(node->get_node_base_interface());
+  executor.spin();
   rclcpp::shutdown();
 
   return 0;

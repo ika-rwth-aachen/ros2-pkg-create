@@ -21,6 +21,7 @@ add_library(${TARGET_NAME} SHARED src/ros2_cpp_node.cpp)
 rclcpp_components_register_node(${TARGET_NAME}
   PLUGIN "ros2_cpp_all_pkg::Ros2CppNode"
   EXECUTABLE ros2_cpp_node
+  EXECUTOR StaticSingleThreadedExecutor
 )
 
 target_include_directories(${TARGET_NAME} PUBLIC

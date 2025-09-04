@@ -5,7 +5,7 @@
 #include <chrono>
 {% endif %}
 #include <functional>
-{% if has_action_server %}
+{% if has_action_server or executor_type == "MultiThreadedExecutor" %}
 #include <thread>
 {% endif %}
 
@@ -30,6 +30,9 @@ namespace {{ package_name }} {
 {{ node_class_name }}::{{ node_class_name }}() : Node("{{ node_name }}") {
 {% endif %}
 
+{% if not is_component and executor_type == "MultiThreadedExecutor" %}
+  this->declareAndLoadParameter("num_threads", num_threads_, "number of threads for MultiThreadedExecutor", false, false, false, 1, std::thread::hardware_concurrency(), 1);
+{% endif %}
 {% if is_lifecycle %}
   int startup_state = lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE;
   this->declareAndLoadParameter("startup_state", startup_state, "Initial lifecycle state", false, false, false);
@@ -153,9 +156,19 @@ void {{ node_class_name }}::setup() {
   parameters_callback_ = this->add_on_set_parameters_callback(std::bind(&{{ node_class_name }}::parametersCallback, this, std::placeholders::_1));
 {% endif %}
 {% if has_subscriber %}
+{% if executor_type == "MultiThreadedExecutor" %}
+
+  // create callback group for potentially multi-threaded execution
+  rclcpp::SubscriptionOptions subscriber_options;
+  subscriber_options.callback_group = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+{% endif %}
 
   // subscriber for handling incoming messages
+{% if executor_type == "MultiThreadedExecutor" %}
+  subscriber_ = this->create_subscription<std_msgs::msg::Int32>("~/input", 10, std::bind(&{{ node_class_name }}::topicCallback, this, std::placeholders::_1), subscriber_options);
+{% else %}
   subscriber_ = this->create_subscription<std_msgs::msg::Int32>("~/input", 10, std::bind(&{{ node_class_name }}::topicCallback, this, std::placeholders::_1));
+{% endif %}
   RCLCPP_INFO(this->get_logger(), "Subscribed to '%s'", subscriber_->get_topic_name());
 {% endif %}
 {% if has_publisher %}
@@ -418,11 +431,20 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn {{ nod
 int main(int argc, char *argv[]) {
 
   rclcpp::init(argc, argv);
-{% if is_lifecycle %}
-  rclcpp::spin(std::make_shared<{{ package_name }}::{{ node_class_name }}>()->get_node_base_interface());
+  auto node = std::make_shared<{{ package_name }}::{{ node_class_name }}>();
+{% if executor_type == "MultiThreadedExecutor" %}
+  rclcpp::executors::{{ executor_type }} executor(rclcpp::ExecutorOptions(), node->num_threads_);
+  RCLCPP_INFO(node->get_logger(), "Spinning node '%s' with %s (%d threads)", node->get_fully_qualified_name(), "{{ executor_type }}", node->num_threads_);
 {% else %}
-  rclcpp::spin(std::make_shared<{{ package_name }}::{{ node_class_name }}>());
+  rclcpp::executors::{{ executor_type }} executor;
+  RCLCPP_INFO(node->get_logger(), "Spinning node '%s' with %s", node->get_fully_qualified_name(), "{{ executor_type }}");
 {% endif %}
+{% if is_lifecycle %}
+  executor.add_node(node->get_node_base_interface());
+{% else %}
+  executor.add_node(node);
+{% endif %}
+  executor.spin();
   rclcpp::shutdown();
 
   return 0;

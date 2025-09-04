@@ -75,6 +75,13 @@ is_lifecycle:
   type: bool
   default: false
 
+executor_type:
+  help: Type of Executor
+  when: "{{ template == 'ros2_cpp_pkg' }}"
+  type: str
+  default: SingleThreadedExecutor
+  choices: [SingleThreadedExecutor, MultiThreadedExecutor, StaticSingleThreadedExecutor]
+
 has_launch_file:
   help: Add a launch file?
   when: "{{ template == 'ros2_cpp_pkg' or template == 'ros2_python_pkg' }}"

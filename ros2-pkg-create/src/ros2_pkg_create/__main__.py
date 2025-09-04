@@ -29,6 +29,7 @@ def parseArguments() -> argparse.Namespace:
     parser.add_argument("--no-is-component", dest="is-component", default=None, action="store_false")
     parser.add_argument("--is-lifecycle", action="store_true", default=None, help="Make it a lifecycle node?")
     parser.add_argument("--no-is-lifecycle", dest="is-lifecycle", default=None, action="store_false")
+    parser.add_argument("--executor-type", type=str, choices=["SingleThreadedExecutor", "MultiThreadedExecutor", "StaticSingleThreadedExecutor"], help="Type of Executor")
     parser.add_argument("--has-launch-file", action="store_true", default=None, help="Add a launch file?")
     parser.add_argument("--no-has-launch-file", dest="has-launch-file", default=None, action="store_false")
     parser.add_argument("--launch-file-type", type=str, choices=["xml", "py", "yml"], help="Type of launch file")

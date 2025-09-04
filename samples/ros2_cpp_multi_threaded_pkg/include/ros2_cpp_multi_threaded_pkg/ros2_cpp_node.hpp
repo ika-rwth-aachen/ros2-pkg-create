@@ -4,15 +4,11 @@
 #include <string>
 #include <vector>
 
-#include <lifecycle_msgs/msg/state.hpp>
-#include <lifecycle_msgs/msg/transition.hpp>
 #include <rclcpp/rclcpp.hpp>
-#include <rclcpp_lifecycle/lifecycle_node.hpp>
-#include <rclcpp_lifecycle/lifecycle_publisher.hpp>
 #include <std_msgs/msg/int32.hpp>
 
 
-namespace ros2_cpp_lifecycle_pkg {
+namespace ros2_cpp_multi_threaded_pkg {
 
 template <typename C> struct is_vector : std::false_type {};
 template <typename T,typename A> struct is_vector< std::vector<T,A> > : std::true_type {};
@@ -22,53 +18,16 @@ template <typename C> inline constexpr bool is_vector_v = is_vector<C>::value;
 /**
  * @brief Ros2CppNode class
  */
-class Ros2CppNode : public rclcpp_lifecycle::LifecycleNode {
+class Ros2CppNode : public rclcpp::Node {
 
  public:
 
   Ros2CppNode();
 
- protected:
-
   /**
-   * @brief Processes 'configuring' transitions to 'inactive' state
-   *
-   * @param state previous state
-   * @return transition result
+   * @brief Number of threads for MultiThreadedExecutor
    */
-  rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn on_configure(const rclcpp_lifecycle::State& state) override;
-
-  /**
-   * @brief Processes 'activating' transitions to 'active' state
-   *
-   * @param state previous state
-   * @return transition result
-   */
-  rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn on_activate(const rclcpp_lifecycle::State& state) override;
-
-  /**
-   * @brief Processes 'deactivating' transitions to 'inactive' state
-   *
-   * @param state previous state
-   * @return transition result
-   */
-  rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn on_deactivate(const rclcpp_lifecycle::State& state) override;
-
-  /**
-   * @brief Processes 'cleaningup' transitions to 'unconfigured' state
-   *
-   * @param state previous state
-   * @return transition result
-   */
-  rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn on_cleanup(const rclcpp_lifecycle::State& state) override;
-
-  /**
-   * @brief Processes 'shuttingdown' transitions to 'finalized' state
-   *
-   * @param state previous state
-   * @return transition result
-   */
-  rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn on_shutdown(const rclcpp_lifecycle::State& state) override;
+  int num_threads_ = 1;
 
  private:
 
@@ -138,7 +97,7 @@ class Ros2CppNode : public rclcpp_lifecycle::LifecycleNode {
   /**
    * @brief Publisher
    */
-  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>::SharedPtr publisher_;
+  rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr publisher_;
 
   /**
    * @brief Dummy parameter (parameter)
