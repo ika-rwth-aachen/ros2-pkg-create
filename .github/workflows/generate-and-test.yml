@@ -108,7 +108,7 @@ jobs:
             -d package_name=${{ matrix.package_name }} \
             $( [ "${{ matrix.is_component }}" = "true" ] && echo "-d is_component=true" ) \
             $( [ "${{ matrix.is_lifecycle }}" = "true" ] && echo "-d is_lifecycle=true" ) \
-            $( [ "${{ matrix.executor_type }}" = "true" ] && echo "-d executor_type=${{ matrix.executor_type }}" ) \
+            $( [ -n "${{ matrix.executor_type }}" ] && echo "-d executor_type=${{ matrix.executor_type }}" ) \
             $( [ "${{ matrix.has_service_server }}" = "true" ] && echo "-d has_service_server=true" ) \
             $( [ "${{ matrix.has_action_server }}" = "true" ] && echo "-d has_action_server=true" ) \
             $( [ "${{ matrix.has_timer }}" = "true" ] && echo "-d has_timer=true" ) \

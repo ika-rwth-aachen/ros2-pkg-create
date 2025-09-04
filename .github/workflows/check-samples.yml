@@ -57,7 +57,7 @@ jobs:
             template: ros2_cpp_pkg
             node_name: ros2_cpp_node
             is_component: false
-            is_lifecycle: true
+            is_lifecycle: false
             executor_type: MultiThreadedExecutor
             has_launch_file: true
             has_params: true
@@ -85,6 +85,7 @@ jobs:
             template: ros2_python_pkg
             node_name: ros2_python_node
             is_lifecycle: false
+            executor_type: SingleThreadedExecutor
             has_launch_file: true
             has_params: true
             has_subscriber: true
@@ -97,6 +98,7 @@ jobs:
             template: ros2_python_pkg
             node_name: ros2_python_node
             is_lifecycle: false
+            executor_type: SingleThreadedExecutor
             has_launch_file: true
             has_params: true
             has_subscriber: true
@@ -107,6 +109,7 @@ jobs:
             has_docker_ros: true
           - package_name: ros2_interfaces_pkg
             template: ros2_interfaces_pkg
+            executor_type: SingleThreadedExecutor
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -129,6 +132,7 @@ jobs:
             -d node_name=${{ matrix.node_name }} \
             -d is_component=${{ matrix.is_component }} \
             -d is_lifecycle=${{ matrix.is_lifecycle }} \
+            -d executor_type=${{ matrix.executor_type }} \
             -d has_launch_file=${{ matrix.has_launch_file }} \
             -d has_params=${{ matrix.has_params }} \
             -d has_subscriber=${{ matrix.has_subscriber }} \
