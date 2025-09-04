@@ -45,21 +45,21 @@ target_include_directories(${TARGET_NAME} PUBLIC
 )
 target_compile_features(${TARGET_NAME} PUBLIC c_std_99 cxx_std_17)
 
-ament_target_dependencies(${TARGET_NAME}
-  rclcpp
+target_link_libraries(${TARGET_NAME} PUBLIC
+  rclcpp::rclcpp
 {% if has_action_server %}
-  rclcpp_action
-  {{ package_name }}_interfaces
+  ${rclcpp_action_TARGETS}
+  {{ '${' ~ package_name ~ '_interfaces_TARGETS}' }}
 {% endif %}
 {% if is_component %}
-  rclcpp_components
+  ${rclcpp_components_TARGETS}
 {% endif %}
 {% if is_lifecycle %}
-  rclcpp_lifecycle
+  ${rclcpp_lifecycle_TARGETS}
 {% endif %}
-  std_msgs
+  ${std_msgs_TARGETS}
 {% if has_service_server %}
-  std_srvs
+  ${std_srvs_TARGETS}
 {% endif %}
 )
 

@@ -29,14 +29,14 @@ target_include_directories(${TARGET_NAME} PUBLIC
 )
 target_compile_features(${TARGET_NAME} PUBLIC c_std_99 cxx_std_17)
 
-ament_target_dependencies(${TARGET_NAME}
-  rclcpp
-  rclcpp_action
-  ros2_cpp_all_pkg_interfaces
-  rclcpp_components
-  rclcpp_lifecycle
-  std_msgs
-  std_srvs
+target_link_libraries(${TARGET_NAME} PUBLIC
+  rclcpp::rclcpp
+  ${rclcpp_action_TARGETS}
+  ${ros2_cpp_all_pkg_interfaces_TARGETS}
+  ${rclcpp_components_TARGETS}
+  ${rclcpp_lifecycle_TARGETS}
+  ${std_msgs_TARGETS}
+  ${std_srvs_TARGETS}
 )
 
 install(TARGETS ${TARGET_NAME}
