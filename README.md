@@ -60,7 +60,7 @@ eval "$(register-python-argcomplete ros2-pkg-create)"
 
 ### C++ Package (`--template ros2_cpp_pkg`)
 
-**Supported Features:** publisher, subscriber, parameter loading, launch file, service server, action server, timer callback, component, lifecycle node, docker-ros
+**Supported Features:** publisher, subscriber, parameter loading, launch file, service server, action server, timer callback, component, lifecycle node, executor, docker-ros
 
 <details>
 <summary>Questionnaire</summary>
@@ -74,6 +74,7 @@ eval "$(register-python-argcomplete ros2-pkg-create)"
 - Class name of node
 - Make it a component?
 - Make it a lifecycle node?
+- Type of Executor
 - Add a launch file? | Type of launch file
 - Add parameter loading?
 - Add a subscriber?
@@ -131,14 +132,11 @@ eval "$(register-python-argcomplete ros2-pkg-create)"
 ## Usage
 
 ```
-usage: ros2-pkg-create [-h] [--defaults] [--use-local-templates] --template {ros2_interfaces_pkg,ros2_python_pkg,ros2_cpp_pkg} [--package-name PACKAGE_NAME] [--description DESCRIPTION]
-                       [--maintainer MAINTAINER] [--maintainer-email MAINTAINER_EMAIL] [--author AUTHOR] [--author-email AUTHOR_EMAIL]
-                       [--license {Apache-2.0,BSL-1.0,BSD-2.0,BSD-2-Clause,BSD-3-Clause,GPL-3.0-only,LGPL-2.1-only,LGPL-3.0-only,MIT,MIT-0}] [--node-name NODE_NAME]
-                       [--node-class-name NODE_CLASS_NAME] [--is-component] [--no-is-component] [--is-lifecycle] [--no-is-lifecycle] [--has-launch-file] [--no-has-launch-file]
-                       [--launch-file-type {xml,py,yml}] [--has-params] [--no-has-params] [--has-subscriber] [--no-has-subscriber] [--has-publisher] [--no-has-publisher]
-                       [--has-service-server] [--no-has-service-server] [--has-action-server] [--no-has-action-server] [--has-timer] [--no-has-timer] [--auto-shutdown]
-                       [--no-auto-shutdown] [--interface-types {Message,Service,Action}] [--msg-name MSG_NAME] [--srv-name SRV_NAME] [--action-name ACTION_NAME] [--has-docker-ros]
-                       [--version]
+usage: ros2-pkg-create [-h] [--defaults] [--use-local-templates] --template {ros2_interfaces_pkg,ros2_cpp_pkg,ros2_python_pkg} [--package-name PACKAGE_NAME] [--description DESCRIPTION] [--maintainer MAINTAINER] [--maintainer-email MAINTAINER_EMAIL] [--author AUTHOR]
+                       [--author-email AUTHOR_EMAIL] [--license {Apache-2.0,BSL-1.0,BSD-2.0,BSD-2-Clause,BSD-3-Clause,GPL-3.0-only,LGPL-2.1-only,LGPL-3.0-only,MIT,MIT-0}] [--node-name NODE_NAME] [--node-class-name NODE_CLASS_NAME] [--is-component] [--no-is-component] [--is-lifecycle]
+                       [--no-is-lifecycle] [--executor-type {SingleThreadedExecutor,MultiThreadedExecutor,StaticSingleThreadedExecutor}] [--has-launch-file] [--no-has-launch-file] [--launch-file-type {xml,py,yml}] [--has-params] [--no-has-params] [--has-subscriber] [--no-has-subscriber]
+                       [--has-publisher] [--no-has-publisher] [--has-service-server] [--no-has-service-server] [--has-action-server] [--no-has-action-server] [--has-timer] [--no-has-timer] [--auto-shutdown] [--no-auto-shutdown] [--interface-types {Message,Service,Action}]
+                       [--msg-name MSG_NAME] [--srv-name SRV_NAME] [--action-name ACTION_NAME] [--has-docker-ros] [--docker-ros-type {github,gitlab}] [--version]
                        destination
 
 Creates a ROS 2 package from templates
@@ -151,7 +149,7 @@ options:
   --defaults            Use defaults for all options
   --use-local-templates
                         Use locally installed templates instead of remotely pulling most recent ones
-  --template {ros2_interfaces_pkg,ros2_python_pkg,ros2_cpp_pkg}
+  --template {ros2_interfaces_pkg,ros2_cpp_pkg,ros2_python_pkg}
                         Template
   --package-name PACKAGE_NAME
                         Package name
@@ -174,6 +172,8 @@ options:
   --no-is-component
   --is-lifecycle        Make it a lifecycle node?
   --no-is-lifecycle
+  --executor-type {SingleThreadedExecutor,MultiThreadedExecutor,StaticSingleThreadedExecutor}
+                        Type of Executor
   --has-launch-file     Add a launch file?
   --no-has-launch-file
   --launch-file-type {xml,py,yml}
@@ -199,6 +199,8 @@ options:
   --action-name ACTION_NAME
                         Action name
   --has-docker-ros      Add the docker-ros CI integration?
+  --docker-ros-type {github,gitlab}
+                        Type of docker-ros CI integration
   --version             show program's version number and exit
 ```
 

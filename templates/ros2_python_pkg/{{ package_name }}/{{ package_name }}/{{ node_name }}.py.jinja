@@ -89,11 +89,15 @@ class {{ node_class_name }}(Node):
         param_desc.read_only = read_only
         if from_value is not None and to_value is not None:
             if param_type == rclpy.Parameter.Type.INTEGER:
-                step_value = step_value if step_value is not None else 1
-                param_desc.integer_range = [IntegerRange(from_value=from_value, to_value=to_value, step=step_value)]
+                range = IntegerRange(from_value=from_value, to_value=to_value)
+                if step_value is not None:
+                    range.step = step_value
+                param_desc.integer_range = [range]
             elif param_type == rclpy.Parameter.Type.DOUBLE:
-                step_value = step_value if step_value is not None else 1.0
-                param_desc.floating_point_range = [FloatingPointRange(from_value=from_value, to_value=to_value, step=step_value)]
+                range = FloatingPointRange(from_value=from_value, to_value=to_value)
+                if step_value is not None:
+                    range.step = step_value
+                param_desc.floating_point_range = [range]
             else:
                 self.get_logger().warn(f"Parameter type of parameter '{name}' does not support specifying a range")
         self.declare_parameter(name, param_type, param_desc)

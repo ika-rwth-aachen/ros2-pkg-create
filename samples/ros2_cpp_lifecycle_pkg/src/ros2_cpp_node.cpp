@@ -40,13 +40,13 @@ void Ros2CppNode::declareAndLoadParameter(const std::string& name,
   if (from_value.has_value() && to_value.has_value()) {
     if constexpr(std::is_integral_v<T>) {
       rcl_interfaces::msg::IntegerRange range;
-      T step = static_cast<T>(step_value.has_value() ? step_value.value() : 1);
-      range.set__from_value(static_cast<T>(from_value.value())).set__to_value(static_cast<T>(to_value.value())).set__step(step);
+      range.set__from_value(static_cast<T>(from_value.value())).set__to_value(static_cast<T>(to_value.value()));
+      if (step_value.has_value()) range.set__step(static_cast<T>(step_value.value()));
       param_desc.integer_range = {range};
     } else if constexpr(std::is_floating_point_v<T>) {
       rcl_interfaces::msg::FloatingPointRange range;
-      T step = static_cast<T>(step_value.has_value() ? step_value.value() : 1.0);
-      range.set__from_value(static_cast<T>(from_value.value())).set__to_value(static_cast<T>(to_value.value())).set__step(step);
+      range.set__from_value(static_cast<T>(from_value.value())).set__to_value(static_cast<T>(to_value.value()));
+      if (step_value.has_value()) range.set__step(static_cast<T>(step_value.value()));
       param_desc.floating_point_range = {range};
     } else {
       RCLCPP_WARN(this->get_logger(), "Parameter type of parameter '%s' does not support specifying a range", name.c_str());
@@ -101,7 +101,7 @@ rcl_interfaces::msg::SetParametersResult Ros2CppNode::parametersCallback(const s
     for (auto& auto_reconfigurable_param : auto_reconfigurable_params_) {
       if (param.get_name() == std::get<0>(auto_reconfigurable_param)) {
         std::get<1>(auto_reconfigurable_param)(param);
-        RCLCPP_INFO(this->get_logger(), "Reconfigured parameter '%s'", param.get_name().c_str());
+        RCLCPP_INFO(this->get_logger(), "Reconfigured parameter '%s' to: %s", param.get_name().c_str(), param.value_to_string().c_str());
         break;
       }
     }
@@ -203,7 +203,11 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn Ros2Cp
 int main(int argc, char *argv[]) {
 
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<ros2_cpp_lifecycle_pkg::Ros2CppNode>()->get_node_base_interface());
+  auto node = std::make_shared<ros2_cpp_lifecycle_pkg::Ros2CppNode>();
+  rclcpp::executors::SingleThreadedExecutor executor;
+  RCLCPP_INFO(node->get_logger(), "Spinning node '%s' with %s", node->get_fully_qualified_name(), "SingleThreadedExecutor");
+  executor.add_node(node->get_node_base_interface());
+  executor.spin();
   rclcpp::shutdown();
 
   return 0;

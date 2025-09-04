@@ -1,9 +1,9 @@
-# {{ package_name }}
+# ros2_cpp_multi_threaded_pkg
 
-{{ description }}
+TODO
 
 - [Container Images](#container-images)
-- [{{ node_name }}](#{{ node_name }})
+- [ros2_cpp_node](#ros2_cpp_node)
 
 
 ### Container Images
@@ -13,7 +13,7 @@
 |  |  |  |
 
 
-## `{{ node_name }}`
+## `ros2_cpp_node`
 
 ### Subscribed Topics
 

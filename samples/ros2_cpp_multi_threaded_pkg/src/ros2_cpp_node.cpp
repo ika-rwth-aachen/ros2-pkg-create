@@ -1,16 +1,15 @@
 #include <functional>
+#include <thread>
 
-#include <ros2_cpp_component_pkg/ros2_cpp_node.hpp>
-
-#include <rclcpp_components/register_node_macro.hpp>
-RCLCPP_COMPONENTS_REGISTER_NODE(ros2_cpp_component_pkg::Ros2CppNode)
+#include <ros2_cpp_multi_threaded_pkg/ros2_cpp_node.hpp>
 
 
-namespace ros2_cpp_component_pkg {
+namespace ros2_cpp_multi_threaded_pkg {
 
 
-Ros2CppNode::Ros2CppNode(const rclcpp::NodeOptions& options) : Node("ros2_cpp_node", options) {
+Ros2CppNode::Ros2CppNode() : Node("ros2_cpp_node") {
 
+  this->declareAndLoadParameter("num_threads", num_threads_, "number of threads for MultiThreadedExecutor", false, false, false, 1, std::thread::hardware_concurrency(), 1);
   this->declareAndLoadParameter("param", param_, "TODO", true, false, false, 0.0, 10.0, 1.0);
   this->setup();
 }
@@ -117,8 +116,12 @@ void Ros2CppNode::setup() {
   // callback for dynamic parameter configuration
   parameters_callback_ = this->add_on_set_parameters_callback(std::bind(&Ros2CppNode::parametersCallback, this, std::placeholders::_1));
 
+  // create callback group for potentially multi-threaded execution
+  rclcpp::SubscriptionOptions subscriber_options;
+  subscriber_options.callback_group = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
   // subscriber for handling incoming messages
-  subscriber_ = this->create_subscription<std_msgs::msg::Int32>("~/input", 10, std::bind(&Ros2CppNode::topicCallback, this, std::placeholders::_1));
+  subscriber_ = this->create_subscription<std_msgs::msg::Int32>("~/input", 10, std::bind(&Ros2CppNode::topicCallback, this, std::placeholders::_1), subscriber_options);
   RCLCPP_INFO(this->get_logger(), "Subscribed to '%s'", subscriber_->get_topic_name());
 
   // publisher for publishing outgoing messages
@@ -132,11 +135,25 @@ void Ros2CppNode::topicCallback(const std_msgs::msg::Int32::ConstSharedPtr& msg)
   RCLCPP_INFO(this->get_logger(), "Message received: '%d'", msg->data);
 
   // publish message
-  std_msgs::msg::Int32::UniquePtr out_msg = std::make_unique<std_msgs::msg::Int32>();
-  out_msg->data = msg->data;
-  RCLCPP_INFO(this->get_logger(), "Message published: '%d'", out_msg->data);
-  publisher_->publish(std::move(out_msg));
+  std_msgs::msg::Int32 out_msg;
+  out_msg.data = msg->data;
+  publisher_->publish(out_msg);
+  RCLCPP_INFO(this->get_logger(), "Message published: '%d'", out_msg.data);
 }
 
 
+}
+
+
+int main(int argc, char *argv[]) {
+
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<ros2_cpp_multi_threaded_pkg::Ros2CppNode>();
+  rclcpp::executors::MultiThreadedExecutor executor(rclcpp::ExecutorOptions(), node->num_threads_);
+  RCLCPP_INFO(node->get_logger(), "Spinning node '%s' with %s (%d threads)", node->get_fully_qualified_name(), "MultiThreadedExecutor", node->num_threads_);
+  executor.add_node(node);
+  executor.spin();
+  rclcpp::shutdown();
+
+  return 0;
 }
