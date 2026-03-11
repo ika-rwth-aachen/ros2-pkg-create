@@ -3,6 +3,7 @@ from typing import Any, Optional, Union
 from geometry_msgs.msg import PointStamped
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 import rclpy.exceptions
 from rcl_interfaces.msg import (FloatingPointRange, IntegerRange, ParameterDescriptor, SetParametersResult)
 
@@ -125,17 +126,37 @@ class Ros2PythonNode(Node):
         # callback for dynamic parameter configuration
         self.add_on_set_parameters_callback(self.parameters_callback)
 
-        # subscriber for handling incoming messages
+        # subscriber for handling incoming messages with suitable quality-of-service settings:
+        #   1. default:     reliable, durability volatile, keep last 10 received messages in queue
+        #                   default ROS 2 setting, requires reliable publisher
+        #   2. sensor data: best effort, durability volatile, keep last message
+        #                   take most recent message, no guarantee to receive every single message
+        #   3. transient:   durability transient local, reliable, keep last message
+        #                   take most recent message, even if it was published while the
+        #                   subscriber was offline, requires transient local publisher
+        subscriber_qos_profile = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=10)
+        # subscriber_qos_profile = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=1)
+        # subscriber_qos_profile = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL, history=HistoryPolicy.KEEP_LAST, depth=1)
         self.subscriber = self.create_subscription(PointStamped,
                                                    "~/input",
                                                    self.topic_callback,
-                                                   qos_profile=10)
+                                                   qos_profile=subscriber_qos_profile)
         self.get_logger().info(f"Subscribed to '{self.subscriber.topic_name}'")
 
-        # publisher for publishing outgoing messages
+        # publisher for publishing outgoing messages with suitable quality-of-service settings:
+        #   1. default:     reliable, durability volatile, keep 10 messages in queue for sending
+        #                   default ROS 2 setting
+        #   2. sensor data: best effort, durability volatile, send last published message
+        #                   no re-transmission if message could not be delivered
+        #   3. transient:   durability transient local, reliable, send last published message
+        #                   keep last published message available for late-joining subscribers,
+        #                   requires transient local subscriber
+        publisher_qos_profile = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=10)
+        # publisher_qos_profile = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=1)
+        # publisher_qos_profile = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL, history=HistoryPolicy.KEEP_LAST, depth=1)
         self.publisher = self.create_publisher(PointStamped,
                                                "~/output",
-                                               qos_profile=10)
+                                               qos_profile=publisher_qos_profile)
         self.get_logger().info(f"Publishing to '{self.publisher.topic_name}'")
 
     def topic_callback(self, msg: PointStamped):
