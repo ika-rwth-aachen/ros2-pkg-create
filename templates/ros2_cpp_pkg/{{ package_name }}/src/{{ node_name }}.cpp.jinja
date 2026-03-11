@@ -188,7 +188,7 @@ void {{ node_class_name }}::setup() {
   */
   auto subscriber_qos_profile = rclcpp::QoS(rclcpp::KeepLast(10)).reliable().durability_volatile();
   // auto subscriber_qos_profile = rclcpp::SensorDataQoS().keep_last(1);
-  // auto subscriber_qos_profile = rclcpp::QoS().reliable().transient_local().keep_last(1);
+  // auto subscriber_qos_profile = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
 {% if executor_type == "MultiThreadedExecutor" %}
   subscriber_ = this->create_subscription<geometry_msgs::msg::PointStamped>("~/input", subscriber_qos_profile, std::bind(&{{ node_class_name }}::topicCallback, this, std::placeholders::_1), subscriber_options);
 {% else %}
@@ -208,8 +208,8 @@ void {{ node_class_name }}::setup() {
                         requires transient local subscriber
   */
   auto publisher_qos_profile = rclcpp::QoS(rclcpp::KeepLast(10)).reliable().durability_volatile();
-  // auto subscriber_qos_profile = rclcpp::SensorDataQoS().keep_last(1);
-  // auto subscriber_qos_profile = rclcpp::QoS().reliable().transient_local().keep_last(1);
+  // auto publisher_qos_profile = rclcpp::SensorDataQoS().keep_last(1);
+  // auto publisher_qos_profile = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
   publisher_ = this->create_publisher<geometry_msgs::msg::PointStamped>("~/output", publisher_qos_profile);
   RCLCPP_INFO(this->get_logger(), "Publishing to '%s'", publisher_->get_topic_name());
 {% endif %}
