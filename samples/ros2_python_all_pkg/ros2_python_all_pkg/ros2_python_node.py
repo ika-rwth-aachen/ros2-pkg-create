@@ -217,9 +217,24 @@ class Ros2PythonNode(Node):
         #   3. transient:   durability transient local, reliable, send last published message
         #                   keep last published message available for late-joining subscribers,
         #                   requires transient local subscriber
-        publisher_qos_profile = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=10)
-        # publisher_qos_profile = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=1)
-        # publisher_qos_profile = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL, history=HistoryPolicy.KEEP_LAST, depth=1)
+        publisher_qos_profile = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.VOLATILE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10
+        )
+        # publisher_qos_profile = QoSProfile(
+        #     reliability=ReliabilityPolicy.BEST_EFFORT,
+        #     durability=DurabilityPolicy.VOLATILE,
+        #     history=HistoryPolicy.KEEP_LAST,
+        #     depth=1
+        # )
+        # publisher_qos_profile = QoSProfile(
+        #     reliability=ReliabilityPolicy.RELIABLE,
+        #     durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        #     history=HistoryPolicy.KEEP_LAST,
+        #     depth=1
+        # )
         self.publisher = self.create_publisher(PointStamped,
                                                "~/output",
                                                qos_profile=publisher_qos_profile)

@@ -130,7 +130,7 @@ void Ros2CppNode::setup() {
         2. sensor data: best effort, durability volatile, keep last message
                         take most recent message, no guarantee to receive every single message
         3. transient:   durability transient local, reliable, keep last message
-                        take most recent message, even if it was published while the
+                        take most recent message, even if it was published while the 
                         subscriber was offline, requires transient local publisher
   */
   auto subscriber_qos_profile = rclcpp::QoS(rclcpp::KeepLast(10)).reliable().durability_volatile();
