@@ -185,9 +185,24 @@ class Ros2PythonNode(Node):
         #   3. transient:   durability transient local, reliable, keep last message
         #                   take most recent message, even if it was published while the
         #                   subscriber was offline, requires transient local publisher
-        subscriber_qos_profile = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=10)
-        # subscriber_qos_profile = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=1)
-        # subscriber_qos_profile = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL, history=HistoryPolicy.KEEP_LAST, depth=1)
+        subscriber_qos_profile = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.VOLATILE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10,
+        )
+        # subscriber_qos_profile = QoSProfile(
+        #     reliability=ReliabilityPolicy.BEST_EFFORT,
+        #     durability=DurabilityPolicy.VOLATILE,
+        #     history=HistoryPolicy.KEEP_LAST,
+        #     depth=1,
+        # )
+        # subscriber_qos_profile = QoSProfile(
+        #     reliability=ReliabilityPolicy.RELIABLE,
+        #     durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        #     history=HistoryPolicy.KEEP_LAST,
+        #     depth=1,
+        # )
         self.subscriber = self.create_subscription(PointStamped,
                                                    "~/input",
                                                    self.topic_callback,
