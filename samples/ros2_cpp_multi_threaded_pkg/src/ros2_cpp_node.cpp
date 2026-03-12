@@ -120,12 +120,34 @@ void Ros2CppNode::setup() {
   rclcpp::SubscriptionOptions subscriber_options;
   subscriber_options.callback_group = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
-  // subscriber for handling incoming messages
-  subscriber_ = this->create_subscription<geometry_msgs::msg::PointStamped>("~/input", 10, std::bind(&Ros2CppNode::topicCallback, this, std::placeholders::_1), subscriber_options);
+  /*  subscriber for handling incoming messages with suitable quality-of-service settings:
+        1. default:     reliable, durability volatile, keep last 10 received messages in queue
+                        default ROS 2 setting, requires reliable publisher
+        2. sensor data: best effort, durability volatile, keep last message
+                        take most recent message, no guarantee to receive every single message
+        3. transient:   durability transient local, reliable, keep last message
+                        take most recent message, even if it was published while the 
+                        subscriber was offline, requires transient local publisher
+  */
+  auto subscriber_qos_profile = rclcpp::QoS(rclcpp::KeepLast(10)).reliable().durability_volatile();
+  // auto subscriber_qos_profile = rclcpp::SensorDataQoS().keep_last(1);
+  // auto subscriber_qos_profile = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+  subscriber_ = this->create_subscription<geometry_msgs::msg::PointStamped>("~/input", subscriber_qos_profile, std::bind(&Ros2CppNode::topicCallback, this, std::placeholders::_1), subscriber_options);
   RCLCPP_INFO(this->get_logger(), "Subscribed to '%s'", subscriber_->get_topic_name());
 
-  // publisher for publishing outgoing messages
-  publisher_ = this->create_publisher<geometry_msgs::msg::PointStamped>("~/output", 10);
+  /*  publisher for publishing outgoing messages with suitable quality-of-service settings:
+        1. default:     reliable, durability volatile, keep 10 messages in queue for sending
+                        default ROS 2 setting
+        2. sensor data: best effort, durability volatile, send last published message
+                        no re-transmission if message could not be delivered
+        3. transient:   durability transient local, reliable, send last published message
+                        keep last published message available for late-joining subscribers,
+                        requires transient local subscriber
+  */
+  auto publisher_qos_profile = rclcpp::QoS(rclcpp::KeepLast(10)).reliable().durability_volatile();
+  // auto publisher_qos_profile = rclcpp::SensorDataQoS().keep_last(1);
+  // auto publisher_qos_profile = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+  publisher_ = this->create_publisher<geometry_msgs::msg::PointStamped>("~/output", publisher_qos_profile);
   RCLCPP_INFO(this->get_logger(), "Publishing to '%s'", publisher_->get_topic_name());
 }
 
