@@ -11,7 +11,9 @@
 
   <license>TODO</license>
 
+  <depend>diagnostic_msgs</depend>
   <depend>diagnostic_updater</depend>
+  <depend>rcl_interfaces</depend>
   <depend>geometry_msgs</depend>
   <depend>rclpy</depend>
   <depend>std_srvs</depend>

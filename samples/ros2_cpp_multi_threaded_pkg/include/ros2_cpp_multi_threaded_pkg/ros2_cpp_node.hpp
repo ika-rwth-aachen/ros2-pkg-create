@@ -93,6 +93,7 @@ class Ros2CppNode : public rclcpp::Node {
    * @brief Subscriber
    */
   rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr subscriber_;
+  rclcpp::CallbackGroup::SharedPtr subscriber_callback_group_;
 
   /**
    * @brief Publisher

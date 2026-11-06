@@ -27,6 +27,7 @@ class Ros2PythonNode(Node):
                                                     to_value=10.0,
                                                     step_value=0.1)
 
+
         self.setup()
 
     def declare_and_load_parameter(self,
@@ -78,7 +79,7 @@ class Ros2PythonNode(Node):
                 param_desc.floating_point_range = [range]
             else:
                 self.get_logger().warn(f"Parameter type of parameter '{name}' does not support specifying a range")
-        self.declare_parameter(name, param_type, param_desc)
+        self.declare_parameter(name, default if read_only else param_type, param_desc)
 
         # load parameter
         try:

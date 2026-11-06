@@ -12,6 +12,9 @@ from launch_ros.actions import Node, SetParameter
 def generate_launch_description():
 
     remappable_topics = [
+{% if has_diagnostics %}
+        DeclareLaunchArgument("diagnostics_topic", default_value="/diagnostics", description="raw diagnostic output topic"),
+{% endif %}
 {% if has_subscriber %}
         DeclareLaunchArgument("input_topic", default_value="~/input"),
 {% endif %}

@@ -11,6 +11,7 @@ Ros2CppNode::Ros2CppNode() : Node("ros2_cpp_node") {
 
   this->declareAndLoadParameter("num_threads", num_threads_, "number of threads for MultiThreadedExecutor", false, false, false, 1, std::thread::hardware_concurrency(), 1);
   this->declareAndLoadParameter("param", param_, "TODO", true, false, false, 0.0, 10.0, 1.0);
+
   this->setup();
 }
 
@@ -50,7 +51,10 @@ void Ros2CppNode::declareAndLoadParameter(const std::string& name,
     }
   }
 
-  this->declare_parameter(name, type, param_desc);
+  if (read_only)
+    this->declare_parameter(name, rclcpp::ParameterValue(param), param_desc);
+  else
+    this->declare_parameter(name, type, param_desc);
 
   try {
     param = this->get_parameter(name).get_value<T>();
@@ -118,7 +122,8 @@ void Ros2CppNode::setup() {
 
   // create callback group for potentially multi-threaded execution
   rclcpp::SubscriptionOptions subscriber_options;
-  subscriber_options.callback_group = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  subscriber_callback_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  subscriber_options.callback_group = subscriber_callback_group_;
 
   /*  subscriber for handling incoming messages with suitable quality-of-service settings:
         1. default:     reliable, durability volatile, keep last 10 received messages in queue

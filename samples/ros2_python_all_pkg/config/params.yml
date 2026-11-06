@@ -3,14 +3,22 @@
     param: 1.0
     diagnostic_updater:
       period: 1.0
-      use_fqn: false
+      # Prefix statuses with the fully qualified node name, including its namespace.
+      # Example: /perception/processor: health. This does not rename topics.
+      use_fqn: true
       topic_diagnostic:
+        enabled: true
+        # Example periodic input bounds; adapt these to the application's contract.
         min_frequency: 0.5
         max_frequency: 1.0
         min_acceptable_timestamp_delta: -0.1
         max_acceptable_timestamp_delta: 0.1
+        # timeout: 6.0  # Derived: max(3 / min_frequency, 0.5) seconds.
       diagnosed_publisher:
+        enabled: true
+        # Example periodic output bounds; disable monitoring for event-driven output.
         min_frequency: 0.5
         max_frequency: 1.0
         min_acceptable_timestamp_delta: -0.1
         max_acceptable_timestamp_delta: 0.1
+        # timeout: 6.0  # Derived: max(3 / min_frequency, 0.5) seconds.

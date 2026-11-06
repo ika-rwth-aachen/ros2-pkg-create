@@ -14,6 +14,8 @@ namespace ros2_cpp_all_pkg {
 
 Ros2CppNode::Ros2CppNode(const rclcpp::NodeOptions& options) : rclcpp_lifecycle::LifecycleNode("ros2_cpp_node", options) {
 
+  initializeDiagnostics();
+  diagnostic_updater_->add("health", this, &Ros2CppNode::health);
   int startup_state = lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE;
   this->declareAndLoadParameter("startup_state", startup_state, "Initial lifecycle state", false, false, false);
   if (startup_state > lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED)
@@ -58,7 +60,10 @@ void Ros2CppNode::declareAndLoadParameter(const std::string& name,
     }
   }
 
-  this->declare_parameter(name, type, param_desc);
+  if (read_only)
+    this->declare_parameter(name, rclcpp::ParameterValue(param), param_desc);
+  else
+    this->declare_parameter(name, type, param_desc);
 
   try {
     param = this->get_parameter(name).get_value<T>();
@@ -120,6 +125,7 @@ rcl_interfaces::msg::SetParametersResult Ros2CppNode::parametersCallback(const s
 
 
 void Ros2CppNode::setup() {
+  std::lock_guard<std::mutex> lock(callback_mutex_);
 
   // callback for dynamic parameter configuration
   parameters_callback_ = this->add_on_set_parameters_callback(std::bind(&Ros2CppNode::parametersCallback, this, std::placeholders::_1));
@@ -166,40 +172,32 @@ void Ros2CppNode::setup() {
     std::bind(&Ros2CppNode::actionHandleAccepted, this, std::placeholders::_1)
   );
 
-  // setup diagnostic updater
-  diagnostic_updater_.setHardwareID("none");
-  diagnostic_updater_.add("Health", this, &Ros2CppNode::health);
-
-  // add diagnostic task for monitoring topic subscription with a moving average over min. 5 incoming messages based on expected minimum frequency
-  const int topic_diagnostic_frequency_window_size = std::ceil(5 / (diagnostic_updater_.getPeriod().seconds() * topic_diagnostic_config_.min_frequency));
-  topic_diagnostic_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
-    "~/input",
-    diagnostic_updater_,
-    diagnostic_updater::FrequencyStatusParam(&topic_diagnostic_config_.min_frequency, &topic_diagnostic_config_.max_frequency, 0.0, topic_diagnostic_frequency_window_size),
-    diagnostic_updater::TimeStampStatusParam(topic_diagnostic_config_.min_acceptable_timestamp_delta, topic_diagnostic_config_.max_acceptable_timestamp_delta)
-  );
-
-  // add diagnostic task for monitoring topic publisher with a moving average over min. 5 incoming messages based on expected minimum frequency
-  const int diagnosed_publisher_frequency_window_size = std::ceil(5 / (diagnostic_updater_.getPeriod().seconds() * diagnosed_publisher_config_.min_frequency));
-  diagnosed_publisher_ = std::make_unique<diagnostic_updater::DiagnosedPublisher<geometry_msgs::msg::PointStamped>>(
-    publisher_,
-    diagnostic_updater_,
-    diagnostic_updater::FrequencyStatusParam(&diagnosed_publisher_config_.min_frequency, &diagnosed_publisher_config_.max_frequency, 0.0, diagnosed_publisher_frequency_window_size),
-    diagnostic_updater::TimeStampStatusParam(diagnosed_publisher_config_.min_acceptable_timestamp_delta, diagnosed_publisher_config_.max_acceptable_timestamp_delta)
-  );
+  // Topic tasks run before the health summary in the same updater cycle.
+  diagnostic_updater_->removeByName("health");
+  if (topic_diagnostic_config_.enabled) {
+    topic_diagnostic_ = std::make_unique<CapturedTopicDiagnostic>(
+      subscriber_->get_topic_name(), *diagnostic_updater_, topic_diagnostic_config_, get_clock());
+  }
+  if (diagnosed_publisher_config_.enabled) {
+    output_diagnostic_ = std::make_unique<CapturedTopicDiagnostic>(
+      publisher_->get_topic_name(), *diagnostic_updater_, diagnosed_publisher_config_, get_clock());
+  }
+  diagnostic_updater_->add("health", this, &Ros2CppNode::health);
 }
 
 
 void Ros2CppNode::topicCallback(const geometry_msgs::msg::PointStamped::ConstSharedPtr& msg) {
+  std::lock_guard<std::mutex> lock(callback_mutex_);
 
-  topic_diagnostic_->tick(msg->header.stamp);
+  if (topic_diagnostic_) topic_diagnostic_->tick(msg->header.stamp);
   RCLCPP_INFO(this->get_logger(), "Message received with stamp: '%d'", msg->header.stamp.sec);
 
   // publish message
   geometry_msgs::msg::PointStamped::UniquePtr out_msg = std::make_unique<geometry_msgs::msg::PointStamped>();
   *out_msg = *msg;
   RCLCPP_INFO(this->get_logger(), "Message published with stamp: '%d'", out_msg->header.stamp.sec);
-  diagnosed_publisher_->publish(std::move(out_msg));
+  publisher_->publish(std::move(out_msg));
+  if (output_diagnostic_) output_diagnostic_->tick(msg->header.stamp);
 }
 
 
@@ -293,39 +291,129 @@ void Ros2CppNode::timerCallback() {
 
   RCLCPP_INFO(this->get_logger(), "Timer triggered");
 
-  // TODO: Remove this demonstration of health status and implement real health checks using `setHealth()`
-  if(health_.status == diagnostic_msgs::msg::DiagnosticStatus::ERROR) {
-    setHealth(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Node is non-functional, unable to obtain, and/or yielding implausible data.", { {"uptime", std::to_string(this->get_clock()->now().seconds())} });
-    health_.status = diagnostic_msgs::msg::DiagnosticStatus::WARN;
-  } else if(health_.status == diagnostic_msgs::msg::DiagnosticStatus::WARN) {
-    setHealth(diagnostic_msgs::msg::DiagnosticStatus::WARN, "Node is able to assess its own performance level, but is not able to reach its desired performance level.");
-    health_.status = diagnostic_msgs::msg::DiagnosticStatus::OK;
-  } else if(health_.status == diagnostic_msgs::msg::DiagnosticStatus::OK) {
-    setHealth(diagnostic_msgs::msg::DiagnosticStatus::OK, "Node is able to assess its own performance level and is reaching its desired performance level.");
-    health_.status = diagnostic_msgs::msg::DiagnosticStatus::STALE;
-  } else {
-    setHealth(diagnostic_msgs::msg::DiagnosticStatus::STALE, "Node performance level cannot be assessed");
-    health_.status = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
-  }
-  // end of demonstration
 }
 
+
+namespace {
+int diagnosticSeverity(unsigned char level) {
+  switch (level) {
+    case diagnostic_msgs::msg::DiagnosticStatus::ERROR: return 3;
+    case diagnostic_msgs::msg::DiagnosticStatus::STALE: return 2;
+    case diagnostic_msgs::msg::DiagnosticStatus::WARN: return 1;
+    default: return 0;
+  }
+}
+
+const char* diagnosticLevelName(unsigned char level) {
+  switch (level) {
+    case diagnostic_msgs::msg::DiagnosticStatus::OK: return "OK";
+    case diagnostic_msgs::msg::DiagnosticStatus::WARN: return "WARN";
+    case diagnostic_msgs::msg::DiagnosticStatus::ERROR: return "ERROR";
+    default: return "STALE";
+  }
+}
+}
+
+void Ros2CppNode::initializeDiagnostics() {
+  bool use_fqn = true;
+  double period = 1.0;
+  declareAndLoadParameter("diagnostic_updater.use_fqn", use_fqn, "Prefix statuses with the fully qualified node name", false, false, true);
+  declareAndLoadParameter("diagnostic_updater.period", period, "Diagnostic publication period in seconds", false, false, true);
+  if (!std::isfinite(period) || period <= 0.0)
+    throw std::invalid_argument("Diagnostic period must be finite and positive");
+  topic_diagnostic_config_ = loadTopicDiagnosticConfig("topic_diagnostic");
+  diagnosed_publisher_config_ = loadTopicDiagnosticConfig("diagnosed_publisher");
+  diagnostic_updater_ = std::make_unique<diagnostic_updater::Updater>(this, period, diagnostic_msgs::msg::DiagnosticStatus::STALE);
+  diagnostic_updater_->setHardwareID("none");
+}
+
+TopicDiagnosticConfig Ros2CppNode::loadTopicDiagnosticConfig(const std::string& name) {
+  TopicDiagnosticConfig config;
+  const std::string prefix = "diagnostic_updater." + name + ".";
+  declareAndLoadParameter(prefix + "enabled", config.enabled, "Monitor this periodic topic", false, false, true);
+  declareAndLoadParameter(prefix + "min_frequency", config.min_frequency, "Minimum frequency in Hz", false, false, true);
+  declareAndLoadParameter(prefix + "max_frequency", config.max_frequency, "Maximum frequency in Hz", false, false, true);
+  declareAndLoadParameter(prefix + "min_acceptable_timestamp_delta", config.min_acceptable_timestamp_delta, "Minimum message age in seconds", false, false, true);
+  declareAndLoadParameter(prefix + "max_acceptable_timestamp_delta", config.max_acceptable_timestamp_delta, "Maximum message age in seconds", false, false, true);
+  if (!std::isfinite(config.min_frequency) || config.min_frequency <= 0.0 ||
+      !std::isfinite(config.max_frequency) || config.max_frequency < config.min_frequency ||
+      !std::isfinite(config.min_acceptable_timestamp_delta) ||
+      !std::isfinite(config.max_acceptable_timestamp_delta) ||
+      config.max_acceptable_timestamp_delta < config.min_acceptable_timestamp_delta)
+    throw std::invalid_argument(prefix + "requires positive ordered frequencies and finite ordered timestamp bounds");
+  config.timeout = std::max(3.0 / config.min_frequency, 0.5);
+  declareAndLoadParameter(prefix + "timeout", config.timeout, "Live topic timeout in seconds", false, false, true);
+  if (!std::isfinite(config.timeout) || config.timeout <= 0.0)
+    throw std::invalid_argument(prefix + "timeout must be finite and positive");
+  return config;
+}
+
+void Ros2CppNode::removeTopicDiagnostics() {
+  if (topic_diagnostic_) {
+    diagnostic_updater_->removeByName(topic_diagnostic_->getName());
+    topic_diagnostic_.reset();
+  }
+  if (output_diagnostic_) {
+    diagnostic_updater_->removeByName(output_diagnostic_->getName());
+    output_diagnostic_.reset();
+  }
+}
 
 void Ros2CppNode::health(diagnostic_updater::DiagnosticStatusWrapper& stat) {
-
-  stat.summary(health_.status, health_.message);
-  for (const auto& [key, value] : health_.key_value_pairs) {
-    stat.add(key, value);
+  std::map<std::string, DiagnosticCheck> checks;
+  {
+    std::lock_guard<std::mutex> lock(diagnostic_mutex_);
+    checks = diagnostic_checks_;
   }
+  const auto state = get_current_state();
+  if (state.id() != lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE) {
+    checks["lifecycle"] = {diagnostic_msgs::msg::DiagnosticStatus::STALE,
+                           "node not active (" + state.label() + ")", {}};
+  } else {
+  if (topic_diagnostic_) {
+    checks["topic.input"] = topic_diagnostic_->result();
+    checks["inputs"] = topic_diagnostic_->progress("received_since_start");
+  }
+  if (output_diagnostic_) {
+    checks["topic.output"] = output_diagnostic_->result();
+    checks["outputs"] = output_diagnostic_->progress("published_since_start");
+  }
+  }
+  // Evaluate application-specific checks here; do not register extra updater tasks.
+  unsigned char level = diagnostic_msgs::msg::DiagnosticStatus::OK;
+  std::string message = "All checks OK";
+  if (checks.empty()) {
+    level = diagnostic_msgs::msg::DiagnosticStatus::STALE;
+    message = "No assessments registered";
+  }
+  for (const auto& [name, check] : checks) {
+    if (diagnosticSeverity(check.level) > diagnosticSeverity(level)) {
+      level = check.level;
+      message = name + ": " + check.message;
+    }
+    stat.add(name, std::string(diagnosticLevelName(check.level)) + ": " + check.message);
+    const auto previous = diagnostic_levels_.find(name);
+    if (previous == diagnostic_levels_.end() || previous->second != check.level) {
+      if (check.level == diagnostic_msgs::msg::DiagnosticStatus::ERROR)
+        RCLCPP_ERROR(get_logger(), "%s: %s", name.c_str(), check.message.c_str());
+      else if (check.level == diagnostic_msgs::msg::DiagnosticStatus::WARN)
+        RCLCPP_WARN(get_logger(), "%s: %s", name.c_str(), check.message.c_str());
+      else if (check.level == diagnostic_msgs::msg::DiagnosticStatus::OK && previous != diagnostic_levels_.end())
+        RCLCPP_INFO(get_logger(), "%s: %s", name.c_str(), check.message.c_str());
+    }
+    diagnostic_levels_[name] = check.level;
+  }
+  for (const auto& [name, check] : checks)
+    for (const auto& [key, value] : check.details)
+      stat.add(name + "." + key, value);
+  stat.summary(level, message);
 }
 
-
-void Ros2CppNode::setHealth(const unsigned char status, const std::string& msg, const std::map<std::string, std::string>& key_value_pairs) {
-
-  health_.status = status;
-  health_.message = msg;
-  health_.key_value_pairs = key_value_pairs;
-  diagnostic_updater_.force_update();
+void Ros2CppNode::setDiagnosticCheck(const std::string& name, const DiagnosticCheck& check) {
+  if (check.level > diagnostic_msgs::msg::DiagnosticStatus::STALE)
+    throw std::invalid_argument("Unknown diagnostic level");
+  std::lock_guard<std::mutex> lock(diagnostic_mutex_);
+  diagnostic_checks_[name] = check;
 }
 
 
@@ -333,15 +421,9 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn Ros2Cp
 
   RCLCPP_INFO(get_logger(), "Configuring to enter 'inactive' state from '%s' state", state.label().c_str());
 
-  this->declareAndLoadParameter("param", param_, "TODO", true, false, false, 0.0, 10.0, 1.0);
-  this->declareAndLoadParameter("diagnostic_updater.topic_diagnostic.min_frequency", topic_diagnostic_config_.min_frequency, "Minimum frequency for incoming messages", true, true, false);
-  this->declareAndLoadParameter("diagnostic_updater.topic_diagnostic.max_frequency", topic_diagnostic_config_.max_frequency, "Maximum frequency for incoming messages", true, true, false);
-  this->declareAndLoadParameter("diagnostic_updater.topic_diagnostic.min_acceptable_timestamp_delta", topic_diagnostic_config_.min_acceptable_timestamp_delta, "Minimum acceptable timestamp delta for incoming messages", true, true, false);
-  this->declareAndLoadParameter("diagnostic_updater.topic_diagnostic.max_acceptable_timestamp_delta", topic_diagnostic_config_.max_acceptable_timestamp_delta, "Maximum acceptable timestamp delta for incoming messages", true, true, false);
-  this->declareAndLoadParameter("diagnostic_updater.diagnosed_publisher.min_frequency", diagnosed_publisher_config_.min_frequency, "Minimum frequency for outgoing messages", true, true, false);
-  this->declareAndLoadParameter("diagnostic_updater.diagnosed_publisher.max_frequency", diagnosed_publisher_config_.max_frequency, "Maximum frequency for outgoing messages", true, true, false);
-  this->declareAndLoadParameter("diagnostic_updater.diagnosed_publisher.min_acceptable_timestamp_delta", diagnosed_publisher_config_.min_acceptable_timestamp_delta, "Minimum acceptable timestamp delta for outgoing messages", true, true, false);
-  this->declareAndLoadParameter("diagnostic_updater.diagnosed_publisher.max_acceptable_timestamp_delta", diagnosed_publisher_config_.max_acceptable_timestamp_delta, "Maximum acceptable timestamp delta for outgoing messages", true, true, false);
+  if (!has_parameter("param"))
+    this->declareAndLoadParameter("param", param_, "TODO", true, false, false, 0.0, 10.0, 1.0);
+
   setup();
 
   return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
@@ -349,9 +431,12 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn Ros2Cp
 
 
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn Ros2CppNode::on_activate(const rclcpp_lifecycle::State& state) {
+  std::lock_guard<std::mutex> lock(callback_mutex_);
 
   RCLCPP_INFO(get_logger(), "Activating to enter 'active' state from '%s' state", state.label().c_str());
 
+  if (topic_diagnostic_) topic_diagnostic_->setActive(true);
+  if (output_diagnostic_) output_diagnostic_->setActive(true);
   publisher_->on_activate();
   timer_ = this->create_wall_timer(std::chrono::duration<double>(param_), std::bind(&Ros2CppNode::timerCallback, this));
 
@@ -360,10 +445,13 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn Ros2Cp
 
 
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn Ros2CppNode::on_deactivate(const rclcpp_lifecycle::State& state) {
+  std::lock_guard<std::mutex> lock(callback_mutex_);
 
   RCLCPP_INFO(get_logger(), "Deactivating to enter 'inactive' state from '%s' state", state.label().c_str());
 
   timer_.reset();
+  if (topic_diagnostic_) topic_diagnostic_->setActive(false);
+  if (output_diagnostic_) output_diagnostic_->setActive(false);
   publisher_->on_deactivate();
 
   return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
@@ -371,9 +459,11 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn Ros2Cp
 
 
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn Ros2CppNode::on_cleanup(const rclcpp_lifecycle::State& state) {
+  std::lock_guard<std::mutex> lock(callback_mutex_);
 
   RCLCPP_INFO(get_logger(), "Cleaning up to enter 'unconfigured' state from '%s' state", state.label().c_str());
 
+  removeTopicDiagnostics();
   subscriber_.reset();
   publisher_.reset();
   service_server_.reset();

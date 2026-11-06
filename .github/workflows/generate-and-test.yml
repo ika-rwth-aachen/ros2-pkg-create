@@ -95,6 +95,74 @@ jobs:
             has_timer: true
             has_diagnostics: true
             auto_shutdown: true
+          - package_name: runtime_cpp_pkg
+            template: ros2_cpp_pkg
+            executor_type: MultiThreadedExecutor
+            has_diagnostics: true
+            auto_shutdown: false
+          - package_name: runtime_python_pkg
+            template: ros2_python_pkg
+            has_diagnostics: true
+            auto_shutdown: false
+          - package_name: runtime_lifecycle_pkg
+            template: ros2_cpp_pkg
+            is_lifecycle: true
+            is_component: true
+            has_params: false
+            has_timer: true
+            has_diagnostics: true
+            auto_shutdown: false
+          - package_name: runtime_no_params_python_pkg
+            template: ros2_python_pkg
+            has_params: false
+            has_diagnostics: true
+            auto_shutdown: false
+          - package_name: runtime_subscriber_python_pkg
+            template: ros2_python_pkg
+            has_params: false
+            has_publisher: false
+            has_diagnostics: true
+            auto_shutdown: false
+          - package_name: runtime_publisher_python_pkg
+            template: ros2_python_pkg
+            has_params: false
+            has_subscriber: false
+            has_diagnostics: true
+            auto_shutdown: false
+          - package_name: runtime_empty_python_pkg
+            template: ros2_python_pkg
+            has_params: false
+            has_subscriber: false
+            has_publisher: false
+            has_diagnostics: true
+            auto_shutdown: false
+          - package_name: runtime_empty_cpp_pkg
+            template: ros2_cpp_pkg
+            has_params: false
+            has_subscriber: false
+            has_publisher: false
+            has_diagnostics: true
+            auto_shutdown: false
+          - package_name: runtime_cpp_xml_pkg
+            template: ros2_cpp_pkg
+            launch_file_type: xml
+            has_diagnostics: true
+            auto_shutdown: false
+          - package_name: runtime_cpp_yml_pkg
+            template: ros2_cpp_pkg
+            launch_file_type: yml
+            has_diagnostics: true
+            auto_shutdown: false
+          - package_name: runtime_python_xml_pkg
+            template: ros2_python_pkg
+            launch_file_type: xml
+            has_diagnostics: true
+            auto_shutdown: false
+          - package_name: runtime_python_yml_pkg
+            template: ros2_python_pkg
+            launch_file_type: yml
+            has_diagnostics: true
+            auto_shutdown: false
           - package_name: interfaces_pkg
             template: ros2_interfaces_pkg
     steps:
@@ -113,7 +181,7 @@ jobs:
           git config --global user.email "dummy@dummy.com"
       - name: Generate packages
         run: |
-          copier copy --trust --defaults \
+          copier copy --trust --defaults --vcs-ref=HEAD \
             -d template=${{ matrix.template }} \
             -d auto_shutdown=${{ matrix.auto_shutdown }} \
             -d package_name=${{ matrix.package_name }} \
@@ -126,6 +194,9 @@ jobs:
             $( [ "${{ matrix.has_diagnostics }}" = "true" ] && echo "-d has_diagnostics=true" ) \
             $( [ "${{ matrix.has_params }}" = "false" ] && echo "-d has_params=false" ) \
             $( [ "${{ matrix.has_launch_file }}" = "false" ] && echo "-d has_launch_file=false" ) \
+            $( [ "${{ matrix.has_subscriber }}" = "false" ] && echo "-d has_subscriber=false" ) \
+            $( [ "${{ matrix.has_publisher }}" = "false" ] && echo "-d has_publisher=false" ) \
+            $( [ -n "${{ matrix.launch_file_type }}" ] && echo "-d launch_file_type=${{ matrix.launch_file_type }}" ) \
             . packages
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -180,6 +251,36 @@ jobs:
             command: ros2 run no_launch_file_python_pkg no_launch_file_python_pkg --ros-args -p param:=1.0
           - package: all_python_pkg
             command: ros2 launch all_python_pkg all_python_pkg_launch.py
+          - package: runtime_cpp_pkg
+            command: |
+              python3 tests/check_diagnostics.py runtime_cpp_pkg --validate-parameters
+              python3 tests/check_diagnostics.py runtime_cpp_pkg --sim-time
+              python3 tests/check_diagnostics.py runtime_cpp_pkg --disabled-topics
+          - package: runtime_python_pkg
+            command: |
+              python3 tests/check_diagnostics.py runtime_python_pkg --validate-parameters
+              python3 tests/check_diagnostics.py runtime_python_pkg --sim-time
+              python3 tests/check_diagnostics.py runtime_python_pkg --disabled-topics
+          - package: runtime_lifecycle_pkg
+            command: python3 tests/check_diagnostics.py runtime_lifecycle_pkg --lifecycle
+          - package: runtime_no_params_python_pkg
+            command: python3 tests/check_diagnostics.py runtime_no_params_python_pkg
+          - package: runtime_subscriber_python_pkg
+            command: python3 tests/check_diagnostics.py runtime_subscriber_python_pkg --no-publisher
+          - package: runtime_publisher_python_pkg
+            command: python3 tests/check_diagnostics.py runtime_publisher_python_pkg --no-subscriber
+          - package: runtime_empty_python_pkg
+            command: python3 tests/check_diagnostics.py runtime_empty_python_pkg --no-subscriber --no-publisher --python-checks
+          - package: runtime_empty_cpp_pkg
+            command: python3 tests/check_diagnostics.py runtime_empty_cpp_pkg --no-subscriber --no-publisher
+          - package: runtime_cpp_xml_pkg
+            command: python3 tests/check_diagnostics.py runtime_cpp_xml_pkg --launch-file-type xml --namespace ''
+          - package: runtime_cpp_yml_pkg
+            command: python3 tests/check_diagnostics.py runtime_cpp_yml_pkg --launch-file-type yml
+          - package: runtime_python_xml_pkg
+            command: python3 tests/check_diagnostics.py runtime_python_xml_pkg --launch-file-type xml --namespace ''
+          - package: runtime_python_yml_pkg
+            command: python3 tests/check_diagnostics.py runtime_python_yml_pkg --launch-file-type yml
           - package: interfaces_pkg
             command: |
               ros2 interface show interfaces_pkg/msg/Message && \
@@ -203,6 +304,9 @@ jobs:
           colcon build --packages-up-to ${{ matrix.package }}
       - name: Run
         shell: bash
+        env:
+          ROS_DOMAIN_ID: "197"
+          ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
         run: |
           source install/setup.bash
           ${{ matrix.command }}

@@ -60,7 +60,7 @@ eval "$(register-python-argcomplete ros2-pkg-create)"
 
 ### C++ Package (`--template ros2_cpp_pkg`)
 
-**Supported Features:** publisher, subscriber, parameter loading, launch file, service server, action server, timer callback, component, lifecycle node, executor, docker-ros
+**Supported Features:** publisher, subscriber, parameter loading, launch file, service server, action server, timer callback, component, lifecycle node, executor, diagnostics, docker-ros
 
 <details>
 <summary>Questionnaire</summary>
@@ -88,7 +88,7 @@ eval "$(register-python-argcomplete ros2-pkg-create)"
 
 ### Python Package (`--template ros2_python_pkg`)
 
-**Supported Features:** publisher, subscriber, parameter loading, launch file, service server, action server, timer callback, docker-ros
+**Supported Features:** publisher, subscriber, parameter loading, launch file, service server, action server, timer callback, diagnostics, docker-ros
 
 <details>
 <summary>Questionnaire</summary>
@@ -110,6 +110,13 @@ eval "$(register-python-argcomplete ros2-pkg-create)"
 - Add a diagnostics updater to publish diagnostics?
 - Add the docker-ros CI integration?
 </details>
+
+With `--has-diagnostics`, generated C++ and Python nodes publish fully qualified
+`health` and periodic topic statuses on `/diagnostics`. Health summarizes topic
+assessments, live progress watchdogs, and application checks. Launch files expose
+`diagnostics_topic`; generated configuration and README describe the checks and
+startup settings. Periodic monitoring can be disabled per topic for event-driven
+interfaces.
 
 ### Interfaces Package (`--template ros2_interfaces_pkg`)
 

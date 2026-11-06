@@ -1,11 +1,12 @@
-import time
 from typing import Any, Optional, Union
 
-from dataclasses import dataclass
+import math
+import threading
+import time
+from dataclasses import dataclass, field
 from diagnostic_msgs.msg import DiagnosticStatus
-from diagnostic_updater import Updater
-from diagnostic_updater import TopicDiagnostic, FrequencyStatusParam, TimeStampStatusParam, DiagnosticStatusWrapper
-from diagnostic_updater import DiagnosedPublisher
+from diagnostic_updater import Updater, DiagnosticStatusWrapper
+from diagnostic_updater import DiagnosticTask, HeaderlessTopicDiagnostic, FrequencyStatusParam
 from geometry_msgs.msg import PointStamped
 import rclpy
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
@@ -18,17 +19,115 @@ from ros2_python_all_pkg_interfaces.action import Fibonacci
 
 
 @dataclass
-class TopicDiagnosticConfig:
-    min_frequency: float
-    max_frequency: float
-    min_acceptable_timestamp_delta: float
-    max_acceptable_timestamp_delta: float
+class DiagnosticCheck:
+    level: int = 3
+    message: str = "Awaiting assessment"
+    details: dict[str, str] = field(default_factory=dict)
+
+
+def level_number(value):
+    return int.from_bytes(value, "little") if isinstance(value, (bytes, bytearray)) else int(value)
+
+
+LEVELS = (DiagnosticStatus.OK, DiagnosticStatus.WARN, DiagnosticStatus.ERROR, DiagnosticStatus.STALE)
+LEVEL_NAMES = ("OK", "WARN", "ERROR", "STALE")
+SEVERITY = {0: 0, 1: 1, 3: 2, 2: 3}
+
 
 @dataclass
-class Health:
-    status: DiagnosticStatus
-    msg: str
-    key_value_pairs: Optional[dict[str, str]] = None
+class TopicDiagnosticConfig:
+    enabled: bool = True
+    min_frequency: float = 0.5
+    max_frequency: float = 1.0
+    min_acceptable_timestamp_delta: float = -0.1
+    max_acceptable_timestamp_delta: float = 0.1
+    timeout: float = 6.0
+
+
+class NodeTimestampStatus(DiagnosticTask):
+    """Assess message age using the node's attached ROS clock."""
+
+    def __init__(self, node, config):
+        super().__init__("Timestamp Status")
+        self.node = node
+        self.config = config
+        self.reset()
+
+    def reset(self):
+        self.min_age = None
+        self.max_age = None
+        self.zero_stamp = False
+
+    def tick(self, stamp):
+        if stamp.nanoseconds == 0:
+            self.zero_stamp = True
+            return
+        age = (self.node.get_clock().now() - stamp).nanoseconds / 1e9
+        self.min_age = age if self.min_age is None else min(age, self.min_age)
+        self.max_age = age if self.max_age is None else max(age, self.max_age)
+
+    def run(self, stat):
+        if self.zero_stamp:
+            stat.summary(DiagnosticStatus.ERROR, "Zero timestamp seen")
+        elif self.min_age is None:
+            stat.summary(DiagnosticStatus.WARN, "No data since last update")
+        elif (self.min_age < self.config.min_acceptable_timestamp_delta or
+              self.max_age > self.config.max_acceptable_timestamp_delta):
+            stat.summary(DiagnosticStatus.ERROR, "Message timestamp outside configured bounds")
+        else:
+            stat.summary(DiagnosticStatus.OK, "Timestamps within bounds")
+        if self.min_age is not None:
+            stat.add("Minimum message age (s)", str(self.min_age))
+            stat.add("Maximum message age (s)", str(self.max_age))
+        self.reset()
+        return stat
+
+
+class CapturedTopicDiagnostic(HeaderlessTopicDiagnostic):
+    """Capture one topic result per cycle; track progress independently of ROS time."""
+
+    def __init__(self, node, topic, updater, config):
+        window = max(1, math.ceil(5.0 / (updater.period * config.min_frequency)))
+        if window > 100000:
+            raise ValueError("Diagnostic frequency window too large")
+        self._lock = threading.Lock()
+        self.config = config
+        self.baseline = time.monotonic()
+        self.last_event = None
+        self.events_since_start = 0
+        self.result = DiagnosticCheck()
+        super().__init__(topic, updater, FrequencyStatusParam(
+            {"min": config.min_frequency, "max": config.max_frequency}, 0.0, window))
+        self.stamp = NodeTimestampStatus(node, config)
+        self.addTask(self.stamp)
+
+    def tick(self, stamp):
+        with self._lock:
+            self.stamp.tick(stamp)
+            super().tick()
+            self.last_event = time.monotonic()
+            self.events_since_start += 1
+
+    def run(self, stat):
+        with self._lock:
+            stat = super().run(stat)
+            if self.last_event is None and time.monotonic() - self.baseline <= self.config.timeout:
+                stat.summary(DiagnosticStatus.STALE, "Awaiting first message")
+            self.result = DiagnosticCheck(level_number(stat.level),
+                                          stat.message or "Frequency and timestamps within bounds")
+            return stat
+
+    def progress(self, counter):
+        with self._lock:
+            age = time.monotonic() - (self.baseline if self.last_event is None else self.last_event)
+            if age > self.config.timeout:
+                check = DiagnosticCheck(2, "Required topic timed out")
+            elif self.last_event is None:
+                check = DiagnosticCheck(3, "Awaiting first message")
+            else:
+                check = DiagnosticCheck(0, "Topic current")
+            check.details = {"age_s": str(age), counter: str(self.events_since_start)}
+            return check
 
 
 class Ros2PythonNode(Node):
@@ -49,34 +148,7 @@ class Ros2PythonNode(Node):
                                                     from_value=0.0,
                                                     to_value=10.0,
                                                     step_value=0.1)
-        self.topic_diagnostic_config = TopicDiagnosticConfig(
-            min_frequency=self.declare_and_load_parameter(name="diagnostic_updater.topic_diagnostic.min_frequency",
-                                                          param_type=rclpy.Parameter.Type.DOUBLE,
-                                                          description="Minimum frequency for incoming messages"),
-            max_frequency=self.declare_and_load_parameter(name="diagnostic_updater.topic_diagnostic.max_frequency",
-                                                          param_type=rclpy.Parameter.Type.DOUBLE,
-                                                          description="Maximum frequency for incoming messages"),
-            min_acceptable_timestamp_delta=self.declare_and_load_parameter(name="diagnostic_updater.topic_diagnostic.min_acceptable_timestamp_delta",
-                                                                          param_type=rclpy.Parameter.Type.DOUBLE,
-                                                                          description="Minimum acceptable timestamp delta for incoming messages"),
-            max_acceptable_timestamp_delta=self.declare_and_load_parameter(name="diagnostic_updater.topic_diagnostic.max_acceptable_timestamp_delta",
-                                                                          param_type=rclpy.Parameter.Type.DOUBLE,
-                                                                          description="Maximum acceptable timestamp delta for incoming messages")
-        )
-        self.diagnosed_publisher_config = TopicDiagnosticConfig(
-            min_frequency=self.declare_and_load_parameter(name="diagnostic_updater.diagnosed_publisher.min_frequency",
-                                                          param_type=rclpy.Parameter.Type.DOUBLE,
-                                                          description="Minimum frequency for outgoing messages"),
-            max_frequency=self.declare_and_load_parameter(name="diagnostic_updater.diagnosed_publisher.max_frequency",
-                                                          param_type=rclpy.Parameter.Type.DOUBLE,
-                                                          description="Maximum frequency for outgoing messages"),
-            min_acceptable_timestamp_delta=self.declare_and_load_parameter(name="diagnostic_updater.diagnosed_publisher.min_acceptable_timestamp_delta",
-                                                                          param_type=rclpy.Parameter.Type.DOUBLE,
-                                                                          description="Minimum acceptable timestamp delta for outgoing messages"),
-            max_acceptable_timestamp_delta=self.declare_and_load_parameter(name="diagnostic_updater.diagnosed_publisher.max_acceptable_timestamp_delta",
-                                                                          param_type=rclpy.Parameter.Type.DOUBLE,
-                                                                          description="Maximum acceptable timestamp delta for outgoing messages")
-        )
+
 
         self.setup()
 
@@ -129,7 +201,7 @@ class Ros2PythonNode(Node):
                 param_desc.floating_point_range = [range]
             else:
                 self.get_logger().warn(f"Parameter type of parameter '{name}' does not support specifying a range")
-        self.declare_parameter(name, param_type, param_desc)
+        self.declare_parameter(name, default if read_only else param_type, param_desc)
 
         # load parameter
         try:
@@ -257,29 +329,34 @@ class Ros2PythonNode(Node):
         # timer for repeatedly invoking a callback to publish messages
         self.timer = self.create_timer(1.0, self.timer_callback)
 
-        # setup diagnostic updater
-        self.diagnostic_updater = Updater(self)
-        self.diagnostic_updater.setHardwareID(self.get_name())
-        self.diagnostic_updater.add("Health", self.health)
-        self.health_ = Health(DiagnosticStatus.STALE, "")
-        # add diagnostic task for monitoring topic subscription with a moving average over min. 5 incoming messages based on expected minimum frequency
-        from math import ceil
-        topic_diagnostic_frequency_window_size = ceil(5 / (self.diagnostic_updater.period * self.topic_diagnostic_config.min_frequency))
-        self.topic_diagnostic = TopicDiagnostic(
-            "~/input",
-            self.diagnostic_updater,
-            FrequencyStatusParam({"min": self.topic_diagnostic_config.min_frequency, "max": self.topic_diagnostic_config.max_frequency}, 0.0, topic_diagnostic_frequency_window_size),
-            TimeStampStatusParam(self.topic_diagnostic_config.min_acceptable_timestamp_delta, self.topic_diagnostic_config.max_acceptable_timestamp_delta)
-        )
-        # add diagnostic task for monitoring topic publisher with a moving average over min. 5 incoming messages based on expected minimum frequency
-        from math import ceil
-        diagnosed_publisher_frequency_window_size = ceil(5 / (self.diagnostic_updater.period * self.diagnosed_publisher_config.min_frequency))
-        self.diagnosed_publisher = DiagnosedPublisher(
-            self.publisher,
-            self.diagnostic_updater,
-            FrequencyStatusParam({"min": self.diagnosed_publisher_config.min_frequency, "max": self.diagnosed_publisher_config.max_frequency}, 0.0, diagnosed_publisher_frequency_window_size),
-            TimeStampStatusParam(self.diagnosed_publisher_config.min_acceptable_timestamp_delta, self.diagnosed_publisher_config.max_acceptable_timestamp_delta)
-        )
+        # Configure diagnostics before registering topic tasks and the final health summary.
+        self._diagnostic_lock = threading.Lock()
+        self._diagnostic_checks = {}
+        self._diagnostic_levels = {}
+        use_fqn = self.declare_and_load_parameter(
+            "diagnostic_updater.use_fqn", rclpy.Parameter.Type.BOOL,
+            "Prefix statuses with the fully qualified node name", True,
+            add_to_auto_reconfigurable_params=False, read_only=True)
+        self.diagnostic_updater = Updater(self, starting_up_status=DiagnosticStatus.STALE)
+        if not math.isfinite(self.diagnostic_updater.period) or self.diagnostic_updater.period <= 0:
+            raise ValueError("Diagnostic period must be finite and positive")
+        self.set_descriptor("diagnostic_updater.period", ParameterDescriptor(
+            type=rclpy.Parameter.Type.DOUBLE.value,
+            description="Diagnostic publication period in seconds", read_only=True))
+        if use_fqn:
+            self.diagnostic_updater.node_name = self.get_fully_qualified_name()
+        self.diagnostic_updater.setHardwareID("none")
+        self.topic_diagnostic = None
+        config = self.load_topic_diagnostic_config("topic_diagnostic")
+        if config.enabled:
+            self.topic_diagnostic = CapturedTopicDiagnostic(
+                self, self.subscriber.topic_name, self.diagnostic_updater, config)
+        self.output_diagnostic = None
+        config = self.load_topic_diagnostic_config("diagnosed_publisher")
+        if config.enabled:
+            self.output_diagnostic = CapturedTopicDiagnostic(
+                self, self.publisher.topic_name, self.diagnostic_updater, config)
+        self.diagnostic_updater.add("health", self.health)
 
     def topic_callback(self, msg: PointStamped):
         """Processes messages received by a subscriber
@@ -288,9 +365,12 @@ class Ros2PythonNode(Node):
             msg (PointStamped): message
         """
 
-        self.topic_diagnostic.tick(rclpy.time.Time.from_msg(msg.header.stamp))
+        if self.topic_diagnostic is not None:
+            self.topic_diagnostic.tick(rclpy.time.Time.from_msg(msg.header.stamp))
         self.get_logger().info(f"Message received with stamp: '{msg.header.stamp}'")
-        self.diagnosed_publisher.publish(msg)
+        self.publisher.publish(msg)
+        if self.output_diagnostic is not None:
+            self.output_diagnostic.tick(rclpy.time.Time.from_msg(msg.header.stamp))
 
     def service_callback(self, request: SetBool.Request, response: SetBool.Response) -> SetBool.Response:
         """Processes service requests
@@ -402,42 +482,71 @@ class Ros2PythonNode(Node):
 
         self.get_logger().info("Timer triggered")
 
-        # TODO: Remove this demonstration of health status and implement real health checks using `setHealth()`
-        if self.health_.status == DiagnosticStatus.ERROR:
-            self.setHealth(DiagnosticStatus.ERROR, "Node is non-functional, unable to obtain, and/or yielding implausible data.", {"uptime": f"{self.get_clock().now().nanoseconds / 1e9}"})
-            self.health_.status = DiagnosticStatus.WARN
-        elif self.health_.status == DiagnosticStatus.WARN:
-            self.setHealth(DiagnosticStatus.WARN, "Node is able to assess its own performance level, but is not able to reach its desired performance level.")
-            self.health_.status = DiagnosticStatus.OK
-        elif self.health_.status == DiagnosticStatus.OK:
-            self.setHealth(DiagnosticStatus.OK, "Node is able to assess its own performance level and is reaching its desired performance level.")
-            self.health_.status = DiagnosticStatus.STALE
-        else:
-            self.setHealth(DiagnosticStatus.STALE, "Node performance level cannot be assessed")
-            self.health_.status = DiagnosticStatus.ERROR
-        # end of demonstration
+
+    def load_topic_diagnostic_config(self, name):
+        config = TopicDiagnosticConfig()
+        prefix = f"diagnostic_updater.{name}."
+        for key in ("enabled", "min_frequency", "max_frequency",
+                    "min_acceptable_timestamp_delta", "max_acceptable_timestamp_delta", "timeout"):
+            if key == "timeout":
+                if not math.isfinite(config.min_frequency) or config.min_frequency <= 0:
+                    raise ValueError(f"{prefix}min_frequency must be finite and positive")
+                config.timeout = max(3.0 / config.min_frequency, 0.5)
+            value = getattr(config, key)
+            param_type = rclpy.Parameter.Type.BOOL if isinstance(value, bool) else rclpy.Parameter.Type.DOUBLE
+            value = self.declare_and_load_parameter(
+                prefix + key, param_type, "Periodic topic diagnostic setting", value,
+                add_to_auto_reconfigurable_params=False, read_only=True)
+            if key != "enabled" and not math.isfinite(value):
+                raise ValueError(f"{prefix}{key} must be finite")
+            setattr(config, key, value)
+        if (config.min_frequency <= 0 or config.max_frequency < config.min_frequency or
+                config.max_acceptable_timestamp_delta < config.min_acceptable_timestamp_delta or
+                config.timeout <= 0):
+            raise ValueError(f"{prefix}requires positive ordered frequencies/timeouts and ordered timestamp bounds")
+        return config
 
     def health(self, stat: DiagnosticStatusWrapper) -> DiagnosticStatusWrapper:
-        """Function called by diagnostic updater to populate diagnostics status
-        """
-
-        stat.summary(self.health_.status, self.health_.msg)
-        if self.health_.key_value_pairs is not None:
-            for key, value in self.health_.key_value_pairs.items():
-                stat.add(key, value)
+        """Summarize captured topic results and application checks once per cycle."""
+        with self._diagnostic_lock:
+            checks = dict(self._diagnostic_checks)
+        if self.topic_diagnostic is not None:
+            checks["topic.input"] = self.topic_diagnostic.result
+            checks["inputs"] = self.topic_diagnostic.progress("received_since_start")
+        if self.output_diagnostic is not None:
+            checks["topic.output"] = self.output_diagnostic.result
+            checks["outputs"] = self.output_diagnostic.progress("published_since_start")
+        # Evaluate application-specific checks here; do not register extra updater tasks.
+        level, message = 0, "All checks OK"
+        if not checks:
+            level, message = 3, "No assessments registered"
+        for name, check in sorted(checks.items()):
+            if SEVERITY[check.level] > SEVERITY[level]:
+                level, message = check.level, f"{name}: {check.message}"
+            stat.add(name, f"{LEVEL_NAMES[check.level]}: {check.message}")
+            previous = self._diagnostic_levels.get(name)
+            if previous != check.level:
+                text = f"{name}: {check.message}"
+                if check.level == 2:
+                    self.get_logger().error(text)
+                elif check.level == 1:
+                    self.get_logger().warning(text)
+                elif check.level == 0 and previous is not None:
+                    self.get_logger().info(text)
+            self._diagnostic_levels[name] = check.level
+        for name, check in sorted(checks.items()):
+            for key, value in sorted(check.details.items()):
+                stat.add(f"{name}.{key}", str(value))
+        stat.summary(LEVELS[level], message)
         return stat
 
-    def setHealth(self, status: DiagnosticStatus, msg: str, key_value_pairs: Optional[dict[str, str]] = None):
-        """Sets the health information published by diagnostic updater
-
-        Args:
-            status (DiagnosticStatus): system status
-            msg (str): status message
-            key_value_pairs (dict[str, str], optional): additional key-value pairs
-        """
-
-        self.health_ = Health(status, msg, key_value_pairs)
-        self.diagnostic_updater.force_update()
+    def set_diagnostic_check(self, name: str, check: DiagnosticCheck):
+        """Store an application check for the periodic health assessment."""
+        check = DiagnosticCheck(level_number(check.level), check.message, dict(check.details))
+        if check.level not in SEVERITY:
+            raise ValueError("Unknown diagnostic level")
+        with self._diagnostic_lock:
+            self._diagnostic_checks[name] = check
 
 
 def main():

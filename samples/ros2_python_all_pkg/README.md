@@ -44,3 +44,57 @@ TODO
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
 |  |  |  |  |
+
+### Diagnostics
+
+The node publishes `diagnostic_msgs/msg/DiagnosticArray` on `/diagnostics` at
+`diagnostic_updater.period`.
+The `diagnostics_topic` launch argument remaps this output.
+`diagnostic_updater.use_fqn` includes the namespace in status names, for
+example `/perception/processor: health`; it does not rename topics.
+
+One `health` status summarizes the checks below, with precedence
+ERROR > STALE > WARN > OK. Each enabled periodic topic also has a
+`<resolved_topic> topic status` entry. Health mirrors those topic results from the
+same updater cycle. No assessments registered produces STALE.
+
+| Check | Assessment | Detail keys |
+| --- | --- | --- |
+| `topic.input` | Input frequency and timestamps | — |
+| `inputs` | STALE before the first message, ERROR after timeout, OK while current | `age_s`, `received_since_start` |
+| `topic.output` | Output frequency and timestamps | — |
+| `outputs` | STALE before the first publication, ERROR after timeout, OK while current | `age_s`, `published_since_start` |
+
+Health values contain sorted `<check> = <LEVEL>: <message>` summaries followed
+by `<check>.<detail>` values. Progress counters count events since the topic
+monitor was created. Live timeouts and frequency checks use elapsed real time;
+message ages use the node's ROS clock. Pausing simulated time does not suspend
+live progress watchdogs. Diagnostic publication follows the updater's timer.
+
+All diagnostic parameters are read-only after startup. Topic settings below
+apply under `diagnostic_updater.topic_diagnostic` for the input and
+`diagnostic_updater.diagnosed_publisher` for the output, when present.
+
+| Parameter | Default | Meaning |
+| --- | --- | --- |
+| `diagnostic_updater.period` | `1.0` | Publication period in seconds |
+| `diagnostic_updater.use_fqn` | `true` | Include the node namespace in status names |
+| `<topic>.enabled` | `true` | Enable periodic monitoring; disable for event-driven topics |
+| `<topic>.min_frequency` | `0.5` | Minimum frequency in Hz |
+| `<topic>.max_frequency` | `1.0` | Maximum frequency in Hz |
+| `<topic>.min_acceptable_timestamp_delta` | `-0.1` | Minimum ROS now minus message stamp in seconds |
+| `<topic>.max_acceptable_timestamp_delta` | `0.1` | Maximum ROS now minus message stamp in seconds |
+| `<topic>.timeout` | `max(3 / min_frequency, 0.5)` | Startup and live progress deadline in seconds |
+
+Rate and timestamp bounds are illustrative and must match the application's
+interface contract. Diagnostics preserve the application topics, timestamps,
+and QoS. A software-only hardware ID of `none` is used.
+
+Application checks are evaluated inside `health`, or stored using
+`set_diagnostic_check(name, DiagnosticCheck(level, message, details))` from an
+application callback. Stored checks persist until replaced, including
+initialization failures. Use an OK result when the condition recovers.
+Check names are lowercase `snake_case`; `topic.*`, `inputs`, `outputs`, and
+`lifecycle` are reserved for the generated assessments. Additional assessments
+belong inside health, rather than separate updater tasks. Deployment-specific
+aggregation and reaction policies are configured by the deployment.

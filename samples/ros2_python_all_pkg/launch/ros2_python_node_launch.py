@@ -12,6 +12,7 @@ from launch_ros.actions import Node, SetParameter
 def generate_launch_description():
 
     remappable_topics = [
+        DeclareLaunchArgument("diagnostics_topic", default_value="/diagnostics", description="raw diagnostic output topic"),
         DeclareLaunchArgument("input_topic", default_value="~/input"),
         DeclareLaunchArgument("output_topic", default_value="~/output"),
     ]
