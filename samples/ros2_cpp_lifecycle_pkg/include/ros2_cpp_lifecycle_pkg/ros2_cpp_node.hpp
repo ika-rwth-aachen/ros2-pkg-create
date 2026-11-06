@@ -1,5 +1,6 @@
 #pragma once
 
+#include <mutex>
 #include <memory>
 #include <string>
 #include <vector>
@@ -119,6 +120,9 @@ class Ros2CppNode : public rclcpp_lifecycle::LifecycleNode {
   void topicCallback(const geometry_msgs::msg::PointStamped::ConstSharedPtr& msg);
 
  private:
+
+  std::mutex callback_mutex_;
+  bool callbacks_active_ = false;
 
   /**
    * @brief Auto-reconfigurable parameters for dynamic reconfiguration

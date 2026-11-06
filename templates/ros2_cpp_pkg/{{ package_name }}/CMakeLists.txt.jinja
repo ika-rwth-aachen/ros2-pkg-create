@@ -7,7 +7,9 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 {% if has_diagnostics %}
+find_package(diagnostic_msgs REQUIRED)
 find_package(diagnostic_updater REQUIRED)
+find_package(rcl_interfaces REQUIRED)
 {% endif %}
 {% if has_subscriber or has_publisher %}
 find_package(geometry_msgs REQUIRED)
@@ -54,7 +56,9 @@ target_compile_features(${TARGET_NAME} PUBLIC c_std_99 cxx_std_17)
 target_link_libraries(${TARGET_NAME} PUBLIC
   rclcpp::rclcpp
 {% if has_diagnostics %}
+  ${diagnostic_msgs_TARGETS}
   ${diagnostic_updater_TARGETS}
+  ${rcl_interfaces_TARGETS}
 {% endif %}
 {% if has_subscriber or has_publisher %}
   ${geometry_msgs_TARGETS}

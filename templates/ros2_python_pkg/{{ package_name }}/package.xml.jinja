@@ -12,7 +12,9 @@
   <license>{{ license }}</license>
 
 {% if has_diagnostics %}
+  <depend>diagnostic_msgs</depend>
   <depend>diagnostic_updater</depend>
+  <depend>rcl_interfaces</depend>
 {% endif %}
 {% if has_subscriber or has_publisher %}
   <depend>geometry_msgs</depend>
@@ -25,6 +27,12 @@
   <depend>{{ package_name }}_interfaces</depend>
 {% endif %}
 
+{% if has_launch_file and launch_file_type == 'xml' %}
+  <exec_depend>launch_xml</exec_depend>
+{% endif %}
+{% if has_launch_file and launch_file_type == 'yml' %}
+  <exec_depend>launch_yaml</exec_depend>
+{% endif %}
   <export>
     <build_type>ament_python</build_type>
   </export>

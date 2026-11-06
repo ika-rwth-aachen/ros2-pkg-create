@@ -53,7 +53,10 @@ void Ros2CppNode::declareAndLoadParameter(const std::string& name,
     }
   }
 
-  this->declare_parameter(name, type, param_desc);
+  if (read_only)
+    this->declare_parameter(name, rclcpp::ParameterValue(param), param_desc);
+  else
+    this->declare_parameter(name, type, param_desc);
 
   try {
     param = this->get_parameter(name).get_value<T>();
@@ -115,6 +118,7 @@ rcl_interfaces::msg::SetParametersResult Ros2CppNode::parametersCallback(const s
 
 
 void Ros2CppNode::setup() {
+  std::lock_guard<std::mutex> lock(callback_mutex_);
 
   // callback for dynamic parameter configuration
   parameters_callback_ = this->add_on_set_parameters_callback(std::bind(&Ros2CppNode::parametersCallback, this, std::placeholders::_1));
@@ -152,6 +156,8 @@ void Ros2CppNode::setup() {
 
 
 void Ros2CppNode::topicCallback(const geometry_msgs::msg::PointStamped::ConstSharedPtr& msg) {
+  std::lock_guard<std::mutex> lock(callback_mutex_);
+  if (!callbacks_active_ || !subscriber_ || !publisher_) return;
 
   RCLCPP_INFO(this->get_logger(), "Message received with stamp: '%d'", msg->header.stamp.sec);
 
@@ -167,7 +173,9 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn Ros2Cp
 
   RCLCPP_INFO(get_logger(), "Configuring to enter 'inactive' state from '%s' state", state.label().c_str());
 
-  this->declareAndLoadParameter("param", param_, "TODO", true, false, false, 0.0, 10.0, 1.0);
+  if (!has_parameter("param"))
+    this->declareAndLoadParameter("param", param_, "TODO", true, false, false, 0.0, 10.0, 1.0);
+
   setup();
 
   return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
@@ -175,16 +183,21 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn Ros2Cp
 
 
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn Ros2CppNode::on_activate(const rclcpp_lifecycle::State& state) {
+  std::lock_guard<std::mutex> lock(callback_mutex_);
 
   RCLCPP_INFO(get_logger(), "Activating to enter 'active' state from '%s' state", state.label().c_str());
 
   publisher_->on_activate();
+
+  callbacks_active_ = true;
 
   return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
 }
 
 
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn Ros2CppNode::on_deactivate(const rclcpp_lifecycle::State& state) {
+  std::lock_guard<std::mutex> lock(callback_mutex_);
+  callbacks_active_ = false;
 
   RCLCPP_INFO(get_logger(), "Deactivating to enter 'inactive' state from '%s' state", state.label().c_str());
 
@@ -195,6 +208,8 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn Ros2Cp
 
 
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn Ros2CppNode::on_cleanup(const rclcpp_lifecycle::State& state) {
+  std::lock_guard<std::mutex> lock(callback_mutex_);
+  callbacks_active_ = false;
 
   RCLCPP_INFO(get_logger(), "Cleaning up to enter 'unconfigured' state from '%s' state", state.label().c_str());
 

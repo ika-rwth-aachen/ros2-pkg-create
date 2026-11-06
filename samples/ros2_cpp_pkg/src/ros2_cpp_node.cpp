@@ -9,6 +9,7 @@ namespace ros2_cpp_pkg {
 Ros2CppNode::Ros2CppNode() : Node("ros2_cpp_node") {
 
   this->declareAndLoadParameter("param", param_, "TODO", true, false, false, 0.0, 10.0, 1.0);
+
   this->setup();
 }
 
@@ -48,7 +49,10 @@ void Ros2CppNode::declareAndLoadParameter(const std::string& name,
     }
   }
 
-  this->declare_parameter(name, type, param_desc);
+  if (read_only)
+    this->declare_parameter(name, rclcpp::ParameterValue(param), param_desc);
+  else
+    this->declare_parameter(name, type, param_desc);
 
   try {
     param = this->get_parameter(name).get_value<T>();

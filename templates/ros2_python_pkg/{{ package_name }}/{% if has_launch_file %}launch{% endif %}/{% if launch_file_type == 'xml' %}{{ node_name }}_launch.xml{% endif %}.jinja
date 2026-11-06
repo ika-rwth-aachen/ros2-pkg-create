@@ -4,9 +4,16 @@
   <arg name="namespace" default="" description="node namespace" />
   <arg name="params" default="$(find-pkg-share {{ package_name }})/config/params.yml" description="path to parameter file" />
 
+{% if has_diagnostics %}
+  <arg name="diagnostics_topic" default="/diagnostics" description="raw diagnostic output topic" />
+{% endif %}
+
   <node pkg="{{ package_name }}" exec="{{ node_name }}" namespace="$(var namespace)" name="$(var name)" output="screen">
 {% if has_params or has_diagnostics %}
-    <param from="$(arg params)" />
+    <param from="$(var params)" />
+{% endif %}
+{% if has_diagnostics %}
+    <remap from="/diagnostics" to="$(var diagnostics_topic)" />
 {% endif %}
   </node>
 
