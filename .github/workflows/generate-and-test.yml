@@ -112,6 +112,13 @@ jobs:
             has_timer: true
             has_diagnostics: true
             auto_shutdown: false
+          - package_name: runtime_lifecycle_multi_pkg
+            template: ros2_cpp_pkg
+            is_lifecycle: true
+            executor_type: MultiThreadedExecutor
+            has_params: false
+            has_diagnostics: true
+            auto_shutdown: false
           - package_name: runtime_no_params_python_pkg
             template: ros2_python_pkg
             has_params: false
@@ -253,9 +260,9 @@ jobs:
             command: ros2 launch all_python_pkg all_python_pkg_launch.py
           - package: runtime_cpp_pkg
             command: |
-              python3 tests/check_diagnostics.py runtime_cpp_pkg --validate-parameters
-              python3 tests/check_diagnostics.py runtime_cpp_pkg --sim-time
-              python3 tests/check_diagnostics.py runtime_cpp_pkg --disabled-topics
+              python3 tests/check_diagnostics.py runtime_cpp_pkg --num-threads 2 --validate-parameters
+              python3 tests/check_diagnostics.py runtime_cpp_pkg --num-threads 2 --sim-time
+              python3 tests/check_diagnostics.py runtime_cpp_pkg --num-threads 2 --disabled-topics
           - package: runtime_python_pkg
             command: |
               python3 tests/check_diagnostics.py runtime_python_pkg --validate-parameters
@@ -263,6 +270,8 @@ jobs:
               python3 tests/check_diagnostics.py runtime_python_pkg --disabled-topics
           - package: runtime_lifecycle_pkg
             command: python3 tests/check_diagnostics.py runtime_lifecycle_pkg --lifecycle
+          - package: runtime_lifecycle_multi_pkg
+            command: python3 tests/check_diagnostics.py runtime_lifecycle_multi_pkg --lifecycle --num-threads 2 --stress-lifecycle
           - package: runtime_no_params_python_pkg
             command: python3 tests/check_diagnostics.py runtime_no_params_python_pkg
           - package: runtime_subscriber_python_pkg

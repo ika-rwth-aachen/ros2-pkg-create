@@ -6,8 +6,10 @@
 #include <cstdint>
 #include <cmath>
 #include <map>
-#include <mutex>
 #include <stdexcept>
+{% endif %}
+{% if is_lifecycle or has_diagnostics %}
+#include <mutex>
 {% endif %}
 #include <memory>
 #include <string>
@@ -379,6 +381,11 @@ class {{ node_class_name }} : public rclcpp::Node {
 {% endif %}
 
  private:
+{% if is_lifecycle %}
+
+  std::mutex callback_mutex_;
+  bool callbacks_active_ = false;
+{% endif %}
 {% if has_params or is_lifecycle or has_diagnostics %}
 
   /**
@@ -444,9 +451,6 @@ class {{ node_class_name }} : public rclcpp::Node {
 {% endif %}
 {% if has_diagnostics %}
 
-{% if is_lifecycle %}
-  std::mutex callback_mutex_;
-{% endif %}
   std::mutex diagnostic_mutex_;
   std::map<std::string, DiagnosticCheck> diagnostic_checks_;
   std::map<std::string, unsigned char> diagnostic_levels_;

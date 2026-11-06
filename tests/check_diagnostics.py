@@ -16,9 +16,9 @@ from lifecycle_msgs.msg import Transition
 from lifecycle_msgs.srv import ChangeState
 from rclpy.clock import Clock, ClockType
 from rclpy.node import Node
-from rosgraph_msgs.msg import Clock as ClockMessage
 from rclpy.parameter import Parameter
 from rclpy.parameter_client import AsyncParameterClient
+from rosgraph_msgs.msg import Clock as ClockMessage
 
 
 def level_number(value):
@@ -57,7 +57,7 @@ def check_package(args):
                 seconds=2.0 if old_stamp else 0.0)).to_msg()
             publisher.publish(msg)
 
-    observer.create_timer(0.05, publish, clock=steady_clock)
+    publish_timer = observer.create_timer(0.05, publish, clock=steady_clock)
 
     def wait_for(predicate, description, timeout=8.0):
         deadline = time.monotonic() + timeout
@@ -118,7 +118,10 @@ def check_package(args):
             command.append(f"namespace:={args.namespace}")
         if args.sim_time:
             command.append("use_sim_time:=true")
-        with (Path(temp) / "node.log").open("w+") as log:
+        if args.num_threads is not None:
+            command.append(f"num_threads:={args.num_threads}")
+        log_path = Path(temp) / "node.log"
+        with log_path.open("w") as log:
             process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
             try:
                 if args.disabled_topics or (args.no_subscriber and args.no_publisher):
@@ -148,8 +151,15 @@ def check_package(args):
                 wait_for(future.done, "read-only parameter rejection")
                 assert not future.result().results[0].successful
 
+                if args.num_threads is not None:
+                    future = client.get_parameters(["num_threads"])
+                    wait_for(future.done, "executor thread count")
+                    assert future.result().values[0].integer_value == args.num_threads
+
                 if args.lifecycle:
-                    for _ in range(2):
+                    if args.stress_lifecycle:
+                        publish_timer.timer_period_ns = 1_000_000
+                    for _ in range(20 if args.stress_lifecycle else 2):
                         transition(Transition.TRANSITION_DEACTIVATE)
                         expect(3, "inactive lifecycle health")
                         assert "node not active (inactive)" in health().message
@@ -158,7 +168,13 @@ def check_package(args):
                         transition(Transition.TRANSITION_CONFIGURE)
                         expect(3, "reconfigured inactive health")
                         transition(Transition.TRANSITION_ACTIVATE)
-                        expect(0, "reactivated stream")
+                        if not args.stress_lifecycle:
+                            expect(0, "reactivated stream")
+                    if args.stress_lifecycle:
+                        publish_timer.timer_period_ns = 50_000_000
+                        expect(0, "stream recovery after concurrent lifecycle transitions")
+                    assert "publisher is not activated" not in log_path.read_text(), \
+                        "A data callback attempted to publish while the lifecycle publisher was inactive"
 
                 prefix = f"{fqn}: "
                 expected = {prefix + "health"}
@@ -181,8 +197,7 @@ def check_package(args):
                         assert summaries[key].startswith(("OK", "WARN", "ERROR", "STALE")[level_number(status.level)] + ":")
                 assert not default_topic, "Diagnostics ignored the launch remapping"
             except BaseException:
-                log.seek(0)
-                print(log.read())
+                print("".join(log_path.read_text().splitlines(keepends=True)[-100:]))
                 raise
             finally:
                 if process.poll() is None:
@@ -244,6 +259,8 @@ if __name__ == "__main__":
     parser.add_argument("--launch-file-type", default="py", choices=("py", "xml", "yml"))
     parser.add_argument("--namespace", default="test")
     parser.add_argument("--lifecycle", action="store_true")
+    parser.add_argument("--stress-lifecycle", action="store_true")
+    parser.add_argument("--num-threads", type=int)
     parser.add_argument("--no-subscriber", action="store_true")
     parser.add_argument("--no-publisher", action="store_true")
     parser.add_argument("--python-checks", action="store_true")

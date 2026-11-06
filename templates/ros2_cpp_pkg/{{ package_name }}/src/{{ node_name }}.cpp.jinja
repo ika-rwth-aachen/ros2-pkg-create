@@ -160,7 +160,7 @@ rcl_interfaces::msg::SetParametersResult {{ node_class_name }}::parametersCallba
 
 
 void {{ node_class_name }}::setup() {
-{% if has_diagnostics and is_lifecycle %}
+{% if is_lifecycle %}
   std::lock_guard<std::mutex> lock(callback_mutex_);
 {% endif %}
 {% if has_params %}
@@ -267,8 +267,9 @@ void {{ node_class_name }}::setup() {
 
 
 void {{ node_class_name }}::topicCallback(const geometry_msgs::msg::PointStamped::ConstSharedPtr& msg) {
-{% if has_diagnostics and is_lifecycle %}
+{% if is_lifecycle %}
   std::lock_guard<std::mutex> lock(callback_mutex_);
+  if (!callbacks_active_ || !subscriber_{% if has_publisher %} || !publisher_{% endif %}) return;
 {% endif %}
 
 {% if has_diagnostics %}
@@ -570,9 +571,7 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn {{ nod
 
 
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn {{ node_class_name }}::on_activate(const rclcpp_lifecycle::State& state) {
-{% if has_diagnostics and is_lifecycle %}
   std::lock_guard<std::mutex> lock(callback_mutex_);
-{% endif %}
 
   RCLCPP_INFO(get_logger(), "Activating to enter 'active' state from '%s' state", state.label().c_str());
 
@@ -595,14 +594,15 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn {{ nod
   auto_shutdown_timer_ = this->create_wall_timer(std::chrono::duration<double>(3.0), std::bind(&{{ node_class_name }}::autoShutdownTimerCallback, this));
 {% endif %}
 
+  callbacks_active_ = true;
+
   return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
 }
 
 
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn {{ node_class_name }}::on_deactivate(const rclcpp_lifecycle::State& state) {
-{% if has_diagnostics and is_lifecycle %}
   std::lock_guard<std::mutex> lock(callback_mutex_);
-{% endif %}
+  callbacks_active_ = false;
 
   RCLCPP_INFO(get_logger(), "Deactivating to enter 'inactive' state from '%s' state", state.label().c_str());
 
@@ -626,9 +626,8 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn {{ nod
 
 
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn {{ node_class_name }}::on_cleanup(const rclcpp_lifecycle::State& state) {
-{% if has_diagnostics and is_lifecycle %}
   std::lock_guard<std::mutex> lock(callback_mutex_);
-{% endif %}
+  callbacks_active_ = false;
 
   RCLCPP_INFO(get_logger(), "Cleaning up to enter 'unconfigured' state from '%s' state", state.label().c_str());
 

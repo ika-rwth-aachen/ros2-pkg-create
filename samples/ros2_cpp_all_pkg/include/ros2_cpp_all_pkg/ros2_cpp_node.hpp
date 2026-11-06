@@ -5,8 +5,8 @@
 #include <cstdint>
 #include <cmath>
 #include <map>
-#include <mutex>
 #include <stdexcept>
+#include <mutex>
 #include <memory>
 #include <string>
 #include <vector>
@@ -318,6 +318,9 @@ class Ros2CppNode : public rclcpp_lifecycle::LifecycleNode {
 
  private:
 
+  std::mutex callback_mutex_;
+  bool callbacks_active_ = false;
+
   /**
    * @brief Auto-reconfigurable parameters for dynamic reconfiguration
    */
@@ -358,7 +361,6 @@ class Ros2CppNode : public rclcpp_lifecycle::LifecycleNode {
    */
   double param_ = 1.0;
 
-  std::mutex callback_mutex_;
   std::mutex diagnostic_mutex_;
   std::map<std::string, DiagnosticCheck> diagnostic_checks_;
   std::map<std::string, unsigned char> diagnostic_levels_;
